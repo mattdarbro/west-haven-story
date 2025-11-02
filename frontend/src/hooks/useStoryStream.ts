@@ -1,16 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { StoryState, Choice } from '../types/story';
+import { StoryState } from '../types/story';
 import { api } from '../services/api';
-
-interface StreamEvent {
-  type: 'loading' | 'narrative' | 'choices' | 'image' | 'audio' | 'complete' | 'error';
-  message?: string;
-  text?: string;
-  choices?: Choice[];
-  url?: string;
-  beat?: number;
-  credits?: number;
-}
 
 export function useStoryStream() {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -19,7 +9,7 @@ export function useStoryStream() {
 
   const startStream = useCallback(async (
     sessionId: string,
-    choiceText: string,
+    choiceId: number,
     onUpdate: (state: Partial<StoryState>) => void
   ) => {
     if (isStreaming) {
@@ -31,19 +21,9 @@ export function useStoryStream() {
     setStreamError(null);
 
     try {
-      // Create EventSource for streaming
-      const eventSource = new EventSource(
-        `${api.baseURL}/story/continue/stream`,
-        {
-          withCredentials: false,
-        }
-      );
-
-      eventSourceRef.current = eventSource;
-
-      // Send the choice via POST (EventSource doesn't support POST, so we'll use a different approach)
       // For now, we'll use the regular API and simulate streaming
-      const response = await api.continueStory(sessionId, choiceText);
+      // TODO: Implement proper SSE streaming when backend supports it
+      const response = await api.continueStory({ session_id: sessionId, choice_id: choiceId });
       
       // Simulate streaming by updating state progressively
       onUpdate({ isLoading: true });

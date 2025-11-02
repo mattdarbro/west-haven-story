@@ -71,7 +71,7 @@ export function useStory() {
     }
 
     // Use streaming for story continuation
-    await startStream(state.sessionId, choice.text, (updates) => {
+    await startStream(state.sessionId, choice.id, (updates) => {
       setState(prev => ({ ...prev, ...updates }));
     });
   }, [state.sessionId, startStream]);
