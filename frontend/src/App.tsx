@@ -1,0 +1,132 @@
+import React, { useEffect } from 'react';
+import { useStory } from './hooks/useStory';
+import { StoryViewer } from './components/StoryViewer';
+import { Choice } from './types/story';
+import { ThemeProvider } from './contexts/ThemeContext';
+
+function App() {
+  const {
+    sessionId,
+    narrative,
+    choices,
+    currentBeat,
+    creditsRemaining,
+    isLoading,
+    error,
+    imageUrl,
+    audioUrl,
+    isStreaming,
+    streamError,
+    startStory,
+    continueStory,
+    clearError,
+    resetStory,
+  } = useStory();
+
+  // Auto-start story if no session exists
+  useEffect(() => {
+    if (!sessionId && !isLoading && !error) {
+      startStory('tfogwf');
+    }
+  }, [sessionId, isLoading, error, startStory]);
+
+  const handleChoiceSelect = (choice: Choice) => {
+    clearError();
+    continueStory(choice);
+  };
+
+  const handleRetry = () => {
+    clearError();
+    if (sessionId) {
+      // If we have a session, try to continue
+      startStory('tfogwf');
+    } else {
+      // Otherwise start fresh
+      startStory('tfogwf');
+    }
+  };
+
+  const handleReset = () => {
+    resetStory();
+    startStory('tfogwf');
+  };
+
+  return (
+    <ThemeProvider worldId="tfogwf">
+      <div className="min-h-screen bg-story-bg">
+      {/* Header */}
+      <header className="bg-dark-900/50 backdrop-blur-sm border-b border-primary-500/20 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-accent-500 rounded-lg flex items-center justify-center">
+                <svg fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5 text-white">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-xl font-fantasy text-primary-300">
+                  Storyteller
+                </h1>
+                <p className="text-xs text-dark-400">
+                  Interactive Narratives
+                </p>
+              </div>
+            </div>
+            
+            {/* Status indicators */}
+            <div className="flex items-center gap-4 text-sm">
+              {sessionId && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-accent-500 rounded-full animate-pulse"></div>
+                    <span className="text-dark-300">Beat {currentBeat}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-secondary-500 rounded-full"></div>
+                    <span className="text-dark-300">{creditsRemaining} credits</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        <StoryViewer
+          state={{
+            sessionId,
+            narrative,
+            choices,
+            currentBeat,
+            creditsRemaining,
+            isLoading,
+            error,
+            imageUrl,
+            audioUrl,
+            isStreaming,
+            streamError,
+          }}
+          onChoiceSelect={handleChoiceSelect}
+          onRetry={handleRetry}
+          onReset={handleReset}
+        />
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-dark-900/30 border-t border-primary-500/10 mt-16">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="text-center text-sm text-dark-500">
+            <p>Powered by AI • Built with React & TypeScript</p>
+            <p className="mt-1">The Forgotten One Who Fell • Dark Fantasy Adventure</p>
+          </div>
+        </div>
+      </footer>
+      </div>
+    </ThemeProvider>
+  );
+}
+
+export default App;
