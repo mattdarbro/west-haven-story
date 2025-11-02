@@ -299,17 +299,26 @@ async def generate_image_node(state: StoryState) -> dict[str, Any]:
             return {"image_url": local_url}
 
         except Exception as e:
-            print(f"Image generation attempt {attempt + 1} failed: {e}")
+            error_msg = str(e)
+            print(f"⚠️  Image generation failed (attempt {attempt + 1}/{max_retries}): {error_msg}")
+            
+            # Check for authentication errors
+            if "401" in error_msg or "unauthorized" in error_msg.lower() or "authentication" in error_msg.lower():
+                print("⚠️  Replicate API authentication failed. Check REPLICATE_API_TOKEN.")
+                return {"image_url": None}  # Don't retry auth errors
+            
+            # Check for invalid model errors
+            if "404" in error_msg or "not found" in error_msg.lower():
+                print(f"⚠️  Invalid Replicate model. Check IMAGE_MODEL setting.")
+                return {"image_url": None}  # Don't retry invalid model errors
+            
             if attempt < max_retries - 1:
                 print(f"Retrying in {retry_delay} seconds...")
                 await asyncio.sleep(retry_delay)
                 retry_delay *= 2  # Exponential backoff
             else:
-                print(f"Image generation failed after {max_retries} attempts")
-                return {
-                    "image_url": None,
-                    "error": f"Image generation failed after {max_retries} attempts: {str(e)}"
-                }
+                print(f"❌ Image generation failed after {max_retries} attempts, continuing without image")
+                return {"image_url": None}  # Don't include error in state, just skip image
 
     return {"image_url": None, "error": "Image generation failed"}
 
