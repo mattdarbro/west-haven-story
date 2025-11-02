@@ -126,25 +126,49 @@ async def startup_event():
         # This allows healthcheck to pass even if RAG loading takes time
         try:
             import asyncio
+            from pathlib import Path
             from backend.story_bible.rag import StoryWorldFactory
 
             def load_world_sync():
                 """Synchronous RAG loading function."""
                 try:
                     default_world = getattr(config, 'DEFAULT_WORLD', 'tfogwf')
-                    # Load default world
-                    rag = StoryWorldFactory.get_world(default_world, auto_load=True)
-                    stats = rag.get_collection_stats()
-
-                    if "error" in stats:
-                        print(f"⚠️  Default world '{default_world}' not indexed yet")
-                        print(f"    Run: python scripts/init_rag.py {default_world}")
-                    else:
-                        print(f"✓ Loaded world '{default_world}'")
+                    print(f"Attempting to load world: {default_world}")
+                    
+                    # Check if bible file exists
+                    bible_path = Path("bibles") / f"{default_world}.md"
+                    if not bible_path.exists():
+                        print(f"⚠️  Bible file not found: {bible_path}")
+                        print(f"    Available bibles: {list(Path('bibles').glob('*.md'))}")
+                        return
+                    
+                    # Try to load existing index
+                    try:
+                        rag = StoryWorldFactory.get_world(default_world, auto_load=True)
+                        stats = rag.get_collection_stats()
+                        
+                        if "error" in stats:
+                            print(f"⚠️  World '{default_world}' not indexed, initializing now...")
+                            # Auto-initialize if not indexed
+                            rag = StoryWorldFactory.initialize_world(default_world, bible_path)
+                            stats = rag.get_collection_stats()
+                            print(f"✓ Initialized and loaded world '{default_world}'")
+                        else:
+                            print(f"✓ Loaded world '{default_world}'")
+                        
+                        print(f"  Documents: {stats.get('document_count', 'unknown')}")
+                    except FileNotFoundError:
+                        # No index exists, initialize it
+                        print(f"⚠️  World '{default_world}' not indexed, initializing now...")
+                        rag = StoryWorldFactory.initialize_world(default_world, bible_path)
+                        stats = rag.get_collection_stats()
+                        print(f"✓ Initialized and loaded world '{default_world}'")
                         print(f"  Documents: {stats.get('document_count', 'unknown')}")
 
                 except Exception as e:
                     print(f"⚠️  Error loading default world: {e}")
+                    import traceback
+                    traceback.print_exc()
 
             # Run RAG loading in background thread (non-blocking)
             loop = asyncio.get_event_loop()
