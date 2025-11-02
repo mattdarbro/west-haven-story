@@ -26,7 +26,7 @@ function App() {
   // Auto-start story if no session exists
   useEffect(() => {
     if (!sessionId && !isLoading && !error) {
-      startStory('tfogwf');
+      startStory('west_haven');
     }
   }, [sessionId, isLoading, error, startStory]);
 
@@ -39,20 +39,20 @@ function App() {
     clearError();
     if (sessionId) {
       // If we have a session, try to continue
-      startStory('tfogwf');
+      startStory('west_haven');
     } else {
       // Otherwise start fresh
-      startStory('tfogwf');
+      startStory('west_haven');
     }
   };
 
   const handleReset = () => {
     resetStory();
-    startStory('tfogwf');
+    startStory('west_haven');
   };
 
   return (
-    <ThemeProvider worldId="tfogwf">
+    <ThemeProvider worldId="west_haven">
       <div className="min-h-screen bg-story-bg">
       {/* Header */}
       <header className="bg-dark-900/50 backdrop-blur-sm border-b border-primary-500/20 sticky top-0 z-10">
@@ -118,9 +118,9 @@ function App() {
       {/* Footer */}
       <footer className="bg-dark-900/30 border-t border-primary-500/10 mt-16">
         <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="text-center text-sm text-dark-500">
+            <div className="text-center text-sm text-dark-500">
             <p>Powered by AI • Built with React & TypeScript</p>
-            <p className="mt-1">The Forgotten One Who Fell • Dark Fantasy Adventure</p>
+            <p className="mt-1">West Haven • Space Station Story</p>
           </div>
         </div>
       </footer>

@@ -28,7 +28,7 @@ export function useStory() {
     }
   }, []);
 
-  const startStory = useCallback(async (worldId: string = 'tfogwf') => {
+  const startStory = useCallback(async (worldId: string = 'west_haven') => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {

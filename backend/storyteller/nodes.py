@@ -208,7 +208,15 @@ async def generate_image_node(state: StoryState) -> dict[str, Any]:
     Returns:
         Updated state with image_url (local path)
     """
-    if not config.can_generate_images or not state.get("image_prompt"):
+    # Skip image generation if not enabled or no prompt
+    if not config.ENABLE_MEDIA_GENERATION:
+        return {"image_url": None}
+    
+    if not config.can_generate_images:
+        print("⚠️  Image generation disabled: Missing REPLICATE_API_TOKEN")
+        return {"image_url": None}
+    
+    if not state.get("image_prompt"):
         return {"image_url": None}
 
     # Enhanced image prompt for consistency
@@ -225,12 +233,24 @@ async def generate_image_node(state: StoryState) -> dict[str, Any]:
             import os
             from datetime import datetime
 
+            if not config.REPLICATE_API_TOKEN:
+                print("⚠️  REPLICATE_API_TOKEN not set, skipping image generation")
+                return {"image_url": None}
+
             # Create client with API token
             client = replicate.Client(api_token=config.REPLICATE_API_TOKEN)
 
+            # Use a valid Replicate model (try specific version if latest fails)
+            model = config.IMAGE_MODEL
+            if model == "stability-ai/sdxl:latest":
+                # Use a specific version for better reliability
+                model = "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5555e08b"
+
+            print(f"Generating image with model: {model}")
+
             # Run Stable Diffusion XL
             output = await client.async_run(
-                config.IMAGE_MODEL,
+                model,
                 input={
                     "prompt": enhanced_prompt,
                     "width": config.IMAGE_WIDTH,
