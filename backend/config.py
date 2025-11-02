@@ -6,7 +6,7 @@ that loads from environment variables with sensible defaults.
 """
 
 from typing import Literal
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,6 +47,16 @@ class AppConfig(BaseSettings):
         default=False,
         description="Enable LangSmith tracing for debugging"
     )
+    
+    @field_validator('LANGCHAIN_TRACING_V2', mode='before')
+    @classmethod
+    def parse_bool_string(cls, v):
+        """Parse boolean from string values (Railway env vars are strings)."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on")
+        return False
 
     LANGCHAIN_PROJECT: str = Field(
         default="storyteller-app",
