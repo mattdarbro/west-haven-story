@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Choice } from '../types/story';
 
 interface ChoicePanelProps {

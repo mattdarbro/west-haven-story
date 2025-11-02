@@ -1,4 +1,3 @@
-import React from 'react';
 import { StoryState, Choice } from '../types/story';
 import { NarrativeCard } from './NarrativeCard';
 import { ChoicePanel } from './ChoicePanel';

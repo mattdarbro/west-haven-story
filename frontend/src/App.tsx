@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useStory } from './hooks/useStory';
 import { StoryViewer } from './components/StoryViewer';
 import { Choice } from './types/story';
