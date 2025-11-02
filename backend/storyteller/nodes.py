@@ -335,7 +335,15 @@ async def generate_audio_node(state: StoryState) -> dict[str, Any]:
     Returns:
         Updated state with audio_url
     """
-    if not config.can_generate_audio or not state.get("narrative_text"):
+    # Skip audio generation if not enabled or no text
+    if not config.ENABLE_MEDIA_GENERATION:
+        return {"audio_url": None}
+    
+    if not config.can_generate_audio:
+        print("⚠️  Audio generation disabled: Missing ELEVENLABS_API_KEY")
+        return {"audio_url": None}
+    
+    if not state.get("narrative_text"):
         return {"audio_url": None}
 
     # Clean and prepare text for narration
@@ -351,6 +359,10 @@ async def generate_audio_node(state: StoryState) -> dict[str, Any]:
             from elevenlabs.client import ElevenLabs
             import os
             from datetime import datetime
+
+            if not config.ELEVENLABS_API_KEY:
+                print("⚠️  ELEVENLABS_API_KEY not set, skipping audio generation")
+                return {"audio_url": None}
 
             # Create ElevenLabs client
             client = ElevenLabs(api_key=config.ELEVENLABS_API_KEY)
@@ -389,19 +401,28 @@ async def generate_audio_node(state: StoryState) -> dict[str, Any]:
             return {"audio_url": local_url}
 
         except Exception as e:
-            print(f"Audio generation attempt {attempt + 1} failed: {e}")
+            error_msg = str(e)
+            print(f"⚠️  Audio generation failed (attempt {attempt + 1}/{max_retries}): {error_msg}")
+            
+            # Check for authentication errors
+            if "401" in error_msg or "unauthorized" in error_msg.lower() or "authentication" in error_msg.lower() or "invalid api key" in error_msg.lower():
+                print("⚠️  ElevenLabs API authentication failed. Check ELEVENLABS_API_KEY.")
+                return {"audio_url": None}  # Don't retry auth errors
+            
+            # Check for quota/limit errors
+            if "429" in error_msg or "quota" in error_msg.lower() or "limit" in error_msg.lower():
+                print("⚠️  ElevenLabs API quota exceeded.")
+                return {"audio_url": None}  # Don't retry quota errors
+            
             if attempt < max_retries - 1:
                 print(f"Retrying in {retry_delay} seconds...")
                 await asyncio.sleep(retry_delay)
                 retry_delay *= 2  # Exponential backoff
             else:
-                print(f"Audio generation failed after {max_retries} attempts")
-                return {
-                    "audio_url": None, 
-                    "error": f"Audio generation failed after {max_retries} attempts: {str(e)}"
-                }
+                print(f"❌ Audio generation failed after {max_retries} attempts, continuing without audio")
+                return {"audio_url": None}  # Don't include error in state, just skip audio
     
-    return {"audio_url": None, "error": "Audio generation failed"}
+    return {"audio_url": None}  # Fallback return
 
 
 # ===== Node 6: Check Beat Completion =====
