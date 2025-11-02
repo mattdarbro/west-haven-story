@@ -85,16 +85,39 @@ async def start_story(request: StartStoryRequest):
                 detail=f"World '{request.world_id}' not found. Available: {available_worlds}"
             )
 
-        # Ensure world is loaded
+        # Ensure world is loaded (auto-initialize if needed)
         try:
+            from pathlib import Path
+            
             rag = StoryWorldFactory.get_world(request.world_id, auto_load=True)
             stats = rag.get_collection_stats()
 
             if "error" in stats:
+                # World not indexed, auto-initialize it
+                bible_path = Path("bibles") / f"{request.world_id}.md"
+                if not bible_path.exists():
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Bible file not found for world '{request.world_id}'"
+                    )
+                
+                print(f"Auto-initializing world '{request.world_id}'...")
+                rag = StoryWorldFactory.initialize_world(request.world_id, bible_path)
+                stats = rag.get_collection_stats()
+                print(f"✓ Initialized world '{request.world_id}' with {stats.get('document_count', 0)} documents")
+        except FileNotFoundError as e:
+            # No index exists, initialize it
+            bible_path = Path("bibles") / f"{request.world_id}.md"
+            if not bible_path.exists():
                 raise HTTPException(
-                    status_code=500,
-                    detail=f"World '{request.world_id}' not initialized. Run: python scripts/init_rag.py {request.world_id}"
+                    status_code=404,
+                    detail=f"Bible file not found for world '{request.world_id}'"
                 )
+            
+            print(f"Auto-initializing world '{request.world_id}'...")
+            rag = StoryWorldFactory.initialize_world(request.world_id, bible_path)
+            stats = rag.get_collection_stats()
+            print(f"✓ Initialized world '{request.world_id}' with {stats.get('document_count', 0)} documents")
         except Exception as e:
             raise HTTPException(
                 status_code=500,
