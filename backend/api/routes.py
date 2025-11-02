@@ -26,6 +26,18 @@ from backend.models.state import (
 from backend.storyteller.graph import create_persistent_graph, run_story_turn
 from backend.story_bible.rag import StoryWorldFactory
 
+# Import config at module level
+try:
+    from backend.config import config
+except Exception as e:
+    # Fallback if config fails to load
+    print(f"⚠️  Config loading failed: {e}")
+    class DummyConfig:
+        CREDITS_PER_NEW_USER = 25
+        ENABLE_CREDIT_SYSTEM = False
+        DEBUG = False
+    config = DummyConfig()
+
 # Create router
 router = APIRouter(tags=["story"])
 
@@ -37,7 +49,6 @@ def get_story_graph():
     global story_graph
     if story_graph is None:
         try:
-            from backend.config import config
             story_graph = create_persistent_graph()
         except Exception as e:
             print(f"⚠️  Error creating story graph: {e}")
