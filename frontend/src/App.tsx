@@ -46,9 +46,11 @@ function App() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     resetStory();
-    startStory('west_haven');
+    // Small delay to ensure state is cleared before starting new story
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await startStory('west_haven');
   };
 
   return (

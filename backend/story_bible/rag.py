@@ -126,13 +126,35 @@ class StoryBibleRAG:
                 f"Call load_and_index() first."
             )
 
-        self.vectorstore = Chroma(
-            collection_name=self._collection_name,
-            embedding_function=self.embeddings,
-            persist_directory=str(persist_dir)
-        )
+        try:
+            self.vectorstore = Chroma(
+                collection_name=self._collection_name,
+                embedding_function=self.embeddings,
+                persist_directory=str(persist_dir)
+            )
 
-        print(f"✓ Loaded existing index for world '{self.world_id}'")
+            # Verify the index has data by checking collection count
+            collection = self.vectorstore._collection
+            doc_count = collection.count()
+
+            if doc_count == 0:
+                raise FileNotFoundError(
+                    f"Index exists but is empty for world '{self.world_id}'. "
+                    f"Call load_and_index() to re-initialize."
+                )
+
+            print(f"✓ Loaded existing index for world '{self.world_id}' ({doc_count} documents)")
+
+        except Exception as e:
+            # Catch ChromaDB errors (like "hnsw segment reader" errors) and treat as missing index
+            error_msg = str(e).lower()
+            if "hnsw" in error_msg or "segment" in error_msg or "nothing found" in error_msg:
+                raise FileNotFoundError(
+                    f"Index corrupted or incomplete for world '{self.world_id}'. "
+                    f"Needs re-initialization. Error: {str(e)}"
+                )
+            # Re-raise other unexpected errors
+            raise
 
     def get_retriever(
         self,
