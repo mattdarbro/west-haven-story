@@ -99,7 +99,7 @@ class StoryBibleRAG:
                 doc.page_content = "\n".join(section_info) + "\n\n" + doc.page_content
 
         # Create vector store with persistence
-        persist_dir = Path(config.CHROMA_PERSIST_DIRECTORY) / self.world_id
+        persist_dir = Path(config.chroma_persist_directory) / self.world_id
         persist_dir.mkdir(parents=True, exist_ok=True)
 
         self.vectorstore = Chroma.from_documents(
@@ -118,7 +118,7 @@ class StoryBibleRAG:
         Raises:
             FileNotFoundError: If no index exists for this world
         """
-        persist_dir = Path(config.CHROMA_PERSIST_DIRECTORY) / self.world_id
+        persist_dir = Path(config.chroma_persist_directory) / self.world_id
 
         if not persist_dir.exists():
             raise FileNotFoundError(

@@ -106,6 +106,17 @@ class AppConfig(BaseSettings):
         default="./chroma_db",
         description="Directory for ChromaDB persistence"
     )
+    
+    # Alias for Railway compatibility (Storage_Path takes precedence if set)
+    Storage_Path: str | None = Field(
+        default=None,
+        description="Alias for CHROMA_PERSIST_DIRECTORY (Railway volume mount path). If set, overrides CHROMA_PERSIST_DIRECTORY"
+    )
+    
+    @property
+    def chroma_persist_directory(self) -> str:
+        """Get ChromaDB persistence directory, using Storage_Path if available."""
+        return self.Storage_Path if self.Storage_Path else self.CHROMA_PERSIST_DIRECTORY
 
     # ===== LLM Configuration =====
     MODEL_NAME: str = Field(
