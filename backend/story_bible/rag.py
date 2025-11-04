@@ -6,6 +6,7 @@ and OpenAI embeddings. It enables consistent storytelling by retrieving relevant
 lore, characters, and locations from the story bible.
 """
 
+import json
 from pathlib import Path
 from typing import Optional
 from langchain_openai import OpenAIEmbeddings
@@ -30,9 +31,11 @@ class StoryBibleRAG:
         Initialize RAG system for a specific story world.
 
         Args:
-            world_id: Identifier for the story world (e.g., "tfogwf")
+            world_id: Identifier for the story world (e.g., "west_haven")
         """
         self.world_id = world_id
+        self.metadata: Optional[dict] = None  # Story metadata loaded from metadata.json
+
         self.embeddings = OpenAIEmbeddings(
             model=config.EMBEDDING_MODEL,
             openai_api_key=config.OPENAI_API_KEY
@@ -50,6 +53,35 @@ class StoryBibleRAG:
 
         self.vectorstore: Optional[Chroma] = None
         self._collection_name = f"{world_id}_bible"
+
+        # Load metadata
+        self._load_metadata()
+
+    def _load_metadata(self) -> None:
+        """
+        Load metadata.json for this story world.
+
+        Metadata contains critical constants like protagonist name, POV,
+        voice settings, etc. that should always be available.
+        """
+        metadata_path = Path("story_worlds") / self.world_id / "metadata.json"
+
+        if not metadata_path.exists():
+            print(f"⚠️  WARNING: No metadata.json found for world '{self.world_id}' at {metadata_path}")
+            print(f"⚠️  Story will work with RAG only, but may not have protagonist name or POV info.")
+            self.metadata = {}
+            return
+
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                self.metadata = json.load(f)
+            print(f"✓ Loaded metadata for world '{self.world_id}'")
+        except json.JSONDecodeError as e:
+            print(f"⚠️  ERROR: Failed to parse metadata.json for '{self.world_id}': {e}")
+            self.metadata = {}
+        except Exception as e:
+            print(f"⚠️  ERROR: Failed to load metadata for '{self.world_id}': {e}")
+            self.metadata = {}
 
     def load_and_index(self, bible_path: str | Path) -> None:
         """
@@ -349,13 +381,13 @@ class StoryWorldFactory:
 
         Args:
             world_id: World identifier
-            bible_path: Path to bible file (defaults to bibles/{world_id}.md)
+            bible_path: Path to bible file (defaults to story_worlds/{world_id}/story_bible.md)
 
         Returns:
             Initialized RAG instance
         """
         if bible_path is None:
-            bible_path = Path("bibles") / f"{world_id}.md"
+            bible_path = Path("story_worlds") / world_id / "story_bible.md"
 
         rag = StoryBibleRAG(world_id)
         rag.load_and_index(bible_path)

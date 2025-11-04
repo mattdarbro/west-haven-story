@@ -24,7 +24,6 @@ from backend.models.state import (
     format_choice_for_api
 )
 from backend.storyteller.graph import create_persistent_graph, run_story_turn
-from backend.story_bible.rag import StoryWorldFactory
 
 # Import config at module level
 try:
@@ -63,9 +62,22 @@ active_sessions: dict[str, dict] = {}
 
 @router.get("/worlds", response_model=list[str])
 async def list_worlds():
-    """List all available story worlds."""
+    """List all available story worlds (based on world_template.json)."""
     try:
-        worlds = StoryWorldFactory.list_worlds()
+        from pathlib import Path
+
+        story_worlds_dir = Path("story_worlds")
+        if not story_worlds_dir.exists():
+            return []
+
+        # Find all directories with world_template.json
+        worlds = []
+        for world_dir in story_worlds_dir.iterdir():
+            if world_dir.is_dir():
+                template_path = world_dir / "world_template.json"
+                if template_path.exists():
+                    worlds.append(world_dir.name)
+
         return worlds
     except Exception as e:
         raise HTTPException(
@@ -88,52 +100,17 @@ async def start_story(request: StartStoryRequest):
         session_id = str(uuid.uuid4())
         user_id = request.user_id or str(uuid.uuid4())
 
-        # Validate world exists
-        available_worlds = StoryWorldFactory.list_worlds()
-        if request.world_id not in available_worlds:
+        # Validate world exists (check for world_template.json)
+        from pathlib import Path
+
+        world_template_path = Path("story_worlds") / request.world_id / "world_template.json"
+        if not world_template_path.exists():
             raise HTTPException(
                 status_code=404,
-                detail=f"World '{request.world_id}' not found. Available: {available_worlds}"
+                detail=f"World '{request.world_id}' not found. Missing world_template.json at {world_template_path}"
             )
 
-        # Ensure world is loaded (auto-initialize if needed)
-        try:
-            from pathlib import Path
-            
-            rag = StoryWorldFactory.get_world(request.world_id, auto_load=True)
-            stats = rag.get_collection_stats()
-
-            if "error" in stats:
-                # World not indexed, auto-initialize it
-                bible_path = Path("bibles") / f"{request.world_id}.md"
-                if not bible_path.exists():
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Bible file not found for world '{request.world_id}'"
-                    )
-                
-                print(f"Auto-initializing world '{request.world_id}'...")
-                rag = StoryWorldFactory.initialize_world(request.world_id, bible_path)
-                stats = rag.get_collection_stats()
-                print(f"✓ Initialized world '{request.world_id}' with {stats.get('document_count', 0)} documents")
-        except FileNotFoundError as e:
-            # No index exists, initialize it
-            bible_path = Path("bibles") / f"{request.world_id}.md"
-            if not bible_path.exists():
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Bible file not found for world '{request.world_id}'"
-                )
-            
-            print(f"Auto-initializing world '{request.world_id}'...")
-            rag = StoryWorldFactory.initialize_world(request.world_id, bible_path)
-            stats = rag.get_collection_stats()
-            print(f"✓ Initialized world '{request.world_id}' with {stats.get('document_count', 0)} documents")
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error loading world: {str(e)}"
-            )
+        print(f"✓ Found world template for '{request.world_id}'")
 
         # Create initial state
         initial_state = create_initial_state(
@@ -202,15 +179,52 @@ async def continue_story(request: ContinueStoryRequest):
         # Update last access
         active_sessions[request.session_id]["last_access"] = datetime.utcnow().isoformat()
 
-        # Format choice as user input
-        user_input = f"Player chose choice {request.choice_id}"
+        # Load previous state from checkpoint to get the choice text
+        graph = get_story_graph()
+        config_dict = {"configurable": {"thread_id": request.session_id}}
 
-        # Run story turn
+        checkpoint = None
+        if hasattr(graph, 'checkpointer') and graph.checkpointer:
+            checkpoint = graph.checkpointer.get(config_dict)
+
+        if not checkpoint:
+            raise HTTPException(
+                status_code=404,
+                detail="No previous state found for session"
+            )
+
+        previous_state = checkpoint["channel_values"]
+
+        # Find the selected choice and extract its continuation text
+        previous_choices = previous_state.get("choices", [])
+        selected_choice = None
+
+        for choice in previous_choices:
+            if choice.get("id") == request.choice_id:
+                selected_choice = choice
+                break
+
+        if not selected_choice:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid choice ID: {request.choice_id}"
+            )
+
+        # Extract the continuation text
+        choice_continuation = selected_choice.get("text", "")
+
+        # Update state with the continuation text before running the turn
+        previous_state["last_choice_continuation"] = choice_continuation
+
+        # Format choice as user input (for message history)
+        user_input = f"Choice {request.choice_id}: {choice_continuation[:100]}..."
+
+        # Run story turn with updated state
         final_state, outputs = await run_story_turn(
-            graph=get_story_graph(),
+            graph=graph,
             user_input=user_input,
             session_id=request.session_id,
-            current_state=None  # Will load from checkpoint
+            current_state=previous_state  # Pass updated state
         )
 
         # Check for errors

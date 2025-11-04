@@ -81,7 +81,7 @@ class AppConfig(BaseSettings):
 
     # ===== Story Settings =====
     DEFAULT_WORLD: str = Field(
-        default="tfogwf",
+        default="west_haven",
         description="Default story world ID"
     )
 
@@ -138,8 +138,8 @@ class AppConfig(BaseSettings):
 
     # ===== LLM Configuration =====
     MODEL_NAME: str = Field(
-        default="claude-3-5-sonnet-20241022",
-        description="Claude model name for narrative generation (claude-3-5-sonnet-20241022 recommended)"
+        default="claude-3-haiku-20240307",
+        description="Claude model name for narrative generation (claude-3-haiku-20240307 for fast testing, claude-sonnet-4-20250514 for production)"
     )
 
     EMBEDDING_MODEL: str = Field(
@@ -168,7 +168,7 @@ class AppConfig(BaseSettings):
     )
 
     ENABLE_MEDIA_GENERATION: bool = Field(
-        default=True,
+        default=False,
         description="Enable image/audio generation (requires API keys)"
     )
 

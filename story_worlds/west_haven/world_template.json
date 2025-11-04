@@ -1,0 +1,299 @@
+{
+  "world_id": "west_haven",
+  "name": "West Haven Station",
+  "version": "2.0-dynamic",
+
+  "narrative_style": {
+    "pov": "third person past tense",
+    "tone": "hopeful romantic sci-fi with mystery elements",
+    "writing_style": "Show emotions through actions and sensory details, blend romance with sci-fi worldbuilding"
+  },
+
+  "world_lore": {
+    "setting": "FS-7 (West Haven Station) - A decommissioned space station in the frontier, supposedly abandoned but secretly inhabited by 'squatters' who've made it home",
+    "time_period": "Near future, corporate-dominated space frontier",
+    "themes": [
+      "Redemption through human connection",
+      "Anti-corporate / finding meaning beyond profit",
+      "Found family vs blood family",
+      "Deferred maintenance as metaphor for neglected relationships",
+      "Second chances"
+    ],
+    "recurring_motifs": [
+      "Broken things being repaired (both literal and metaphorical)",
+      "Corporate negligence and its human cost",
+      "Beauty in unexpected places",
+      "Trust rebuilt slowly",
+      "Past trauma vs future hope"
+    ],
+    "atmosphere": "Lived-in sci-fi realism - rusty but functional, improvised repairs, warm lighting in dark spaces, green plants defying the cold vacuum"
+  },
+
+  "character_arc_template": {
+    "protagonist": {
+      "archetype": "Burned-out corporate professional seeking meaning",
+      "starting_state": "Cynical, emotionally closed-off, workaholic, running from grief/guilt",
+      "internal_conflict": "Career ambition and loyalty to corporation vs authentic human connection",
+      "transformation_journey": "Learns to trust, opens up emotionally, finds purpose beyond work, reclaims creativity/passion",
+      "ending_state": "Integrated self, purposeful, open to love and community, at peace with past",
+      "key_vulnerability": "Fear of being impractical or failing like someone they loved"
+    },
+    "love_interest": {
+      "archetype": "Idealistic dreamer who stayed behind",
+      "contrast_to_protagonist": "Warm, optimistic, community-focused, already knows what matters",
+      "internal_conflict": "Hope for the future vs grief over past losses, wanting to save everyone",
+      "role": "Mirror showing protagonist who they could be, catalyst for change",
+      "key_vulnerability": "Carries guilt over not saving someone, fears loss"
+    },
+    "relationship_arc": "Suspicion → Curiosity → Attraction → Vulnerability → Crisis/Separation → Reconciliation → Commitment"
+  },
+
+  "beat_structure": [
+    {
+      "beat": 1,
+      "name": "The Crash Landing",
+      "act": 1,
+      "goal": "Establish protagonist's crisis, introduce setting and love interest",
+      "emotional_arc": "fear/desperation → cautious hope",
+      "turns": 4,
+      "key_moments": [
+        "Emergency crash landing on supposedly abandoned station",
+        "First encounter with station inhabitant (love interest)",
+        "Realization the station isn't abandoned - it's home to people"
+      ],
+      "dramatic_questions": [
+        "Will protagonist get rescued?",
+        "Who are these people and why do they live here?",
+        "Can protagonist trust them?"
+      ],
+      "success_criteria": "Protagonist accepts temporary shelter and meets love interest"
+    },
+    {
+      "beat": 2,
+      "name": "Exploring the Station",
+      "act": 1,
+      "goal": "World-building, chemistry, reveal protagonist's backstory",
+      "emotional_arc": "guardedness → curiosity → growing attraction",
+      "turns": 5,
+      "key_moments": [
+        "Tour of the station reveals ingenuity and community",
+        "Shared meal or vulnerability moment",
+        "Discovery of shared history or loss (corporate connection)"
+      ],
+      "dramatic_questions": [
+        "What brought protagonist to this crisis?",
+        "What tragedy keeps love interest here?",
+        "What's the real cost of the corporate world?"
+      ],
+      "success_criteria": "Protagonist begins to see station as more than a stopover"
+    },
+    {
+      "beat": 3,
+      "name": "First Connection",
+      "act": 1,
+      "goal": "Deepen relationship, protagonist helps with station problem",
+      "emotional_arc": "attraction → trust → first real vulnerability",
+      "turns": 4,
+      "key_moments": [
+        "Crisis requires protagonist to use their skills",
+        "Working together creates bond",
+        "First moment of real emotional honesty between them"
+      ],
+      "dramatic_questions": [
+        "Can protagonist offer more than their corporate skills?",
+        "Will they choose to stay or return to old life?",
+        "What would it mean to belong here?"
+      ],
+      "success_criteria": "Protagonist actively chooses to help, not just wait for rescue"
+    },
+    {
+      "beat": 4,
+      "name": "The Message",
+      "act": 1,
+      "goal": "External world intrudes, force choice between old and new life",
+      "emotional_arc": "contentment → crisis → internal conflict",
+      "turns": 4,
+      "key_moments": [
+        "Rescue/return to corporate world becomes possible",
+        "Station faces external threat (corporate, resource, etc)",
+        "Protagonist must decide where they belong"
+      ],
+      "dramatic_questions": [
+        "Will protagonist return to old life?",
+        "Can they protect the station?",
+        "What do they really want?"
+      ],
+      "success_criteria": "Protagonist faces clear choice between two lives (Act 1 turning point)"
+    },
+    {
+      "beat": 5,
+      "name": "Choosing to Stay",
+      "act": 2,
+      "goal": "Commitment to new life, deepen romance, face consequences",
+      "emotional_arc": "decision → dedication → deeper intimacy",
+      "turns": 5,
+      "key_moments": [
+        "Protagonist actively chooses station/love interest",
+        "Begin working on long-term solution to threat",
+        "Romantic relationship deepens significantly"
+      ],
+      "dramatic_questions": [
+        "What did they give up to stay?",
+        "Can they really fit in this new world?",
+        "What does the corporation want?"
+      ],
+      "success_criteria": "Protagonist fully commits to station community and relationship"
+    },
+    {
+      "beat": 6,
+      "name": "Building Together",
+      "act": 2,
+      "goal": "Show partnership working, but hint at coming crisis",
+      "emotional_arc": "joy → growing unease → foreshadowing",
+      "turns": 4,
+      "key_moments": [
+        "Protagonist and love interest work as team",
+        "Discover deeper conspiracy or threat",
+        "Small cracks appear (past trauma resurfaces)"
+      ],
+      "dramatic_questions": [
+        "Can this happiness last?",
+        "What is the corporation really planning?",
+        "What secrets are still hidden?"
+      ],
+      "success_criteria": "Establish happy partnership while planting seeds of Act 2 crisis"
+    },
+    {
+      "beat": 7,
+      "name": "The Dark Secret",
+      "act": 2,
+      "goal": "Reveal truth about station/past, create relationship rift",
+      "emotional_arc": "partnership → betrayal/hurt → separation",
+      "turns": 5,
+      "key_moments": [
+        "Major revelation about station's past or love interest's secret",
+        "Truth challenges protagonist's trust",
+        "Relationship fractures under weight of secrets"
+      ],
+      "dramatic_questions": [
+        "Can they forgive each other?",
+        "Was any of it real?",
+        "What was worth lying about?"
+      ],
+      "success_criteria": "Relationship reaches crisis point (Act 2 midpoint reversal)"
+    },
+    {
+      "beat": 8,
+      "name": "Separated",
+      "act": 2,
+      "goal": "Protagonists apart, each faces crisis alone, realizes what they've lost",
+      "emotional_arc": "anger/hurt → loneliness → regret → understanding",
+      "turns": 4,
+      "key_moments": [
+        "Protagonist and love interest work separately",
+        "Each faces challenge that shows what other meant to them",
+        "Begin to understand other's perspective"
+      ],
+      "dramatic_questions": [
+        "Is the relationship over?",
+        "Can they solve problems alone?",
+        "What really matters most?"
+      ],
+      "success_criteria": "Both realize they need each other (Act 2 turning point)"
+    },
+    {
+      "beat": 9,
+      "name": "The External Threat",
+      "act": 3,
+      "goal": "External crisis forces reconciliation, test of true commitment",
+      "emotional_arc": "separation → reunion → partnership forged in fire",
+      "turns": 5,
+      "key_moments": [
+        "Major external threat to station (corporate takeover, disaster, etc)",
+        "Protagonist and love interest must work together to survive",
+        "Emotional reconciliation while solving crisis"
+      ],
+      "dramatic_questions": [
+        "Can they save the station?",
+        "Will they rebuild trust?",
+        "What will they sacrifice?"
+      ],
+      "success_criteria": "Reunited and working together against external threat"
+    },
+    {
+      "beat": 10,
+      "name": "The Sacrifice",
+      "act": 3,
+      "goal": "Protagonist proves transformation, faces fear, makes hard choice",
+      "emotional_arc": "unity → crisis → courage → transformation",
+      "turns": 4,
+      "key_moments": [
+        "Protagonist must risk something dear (career, safety, pride)",
+        "Love interest faces parallel choice",
+        "Demonstrate growth from beginning of story"
+      ],
+      "dramatic_questions": [
+        "What are they willing to lose?",
+        "Have they really changed?",
+        "Can love conquer fear?"
+      ],
+      "success_criteria": "Protagonist acts from transformed self, not old patterns"
+    },
+    {
+      "beat": 11,
+      "name": "The Climax",
+      "act": 3,
+      "goal": "Resolve external threat, solidify transformation and commitment",
+      "emotional_arc": "final test → triumph → relief → joy",
+      "turns": 5,
+      "key_moments": [
+        "Final confrontation with external threat",
+        "Station saved through combined community effort",
+        "Protagonist's skills + new values = victory"
+      ],
+      "dramatic_questions": [
+        "Will they succeed?",
+        "What does victory cost?",
+        "Where do they go from here?"
+      ],
+      "success_criteria": "External threat resolved, protagonist fully transformed"
+    },
+    {
+      "beat": 12,
+      "name": "New Beginning",
+      "act": 3,
+      "goal": "Show new life, celebrate transformation, promise of future",
+      "emotional_arc": "resolution → peace → hope → commitment to future",
+      "turns": 3,
+      "key_moments": [
+        "Protagonist integrated into station community",
+        "Relationship solidified (commitment scene)",
+        "Vision of future together"
+      ],
+      "dramatic_questions": [
+        "What does happily ever after look like?",
+        "How have they changed?",
+        "What's next for them?"
+      ],
+      "success_criteria": "Story concludes with clear sense of transformed life and future hope"
+    }
+  ],
+
+  "generation_guidelines": {
+    "protagonist_naming": "Choose a name that feels professional but approachable. Consider diverse backgrounds.",
+    "love_interest_naming": "Choose a name that contrasts with protagonist - perhaps more casual or multicultural.",
+    "supporting_cast": "Station inhabitants should feel diverse and realized - engineers, botanists, former corporate, refugees, dreamers",
+    "locations_to_develop": [
+      "Docking bay (first impression)",
+      "Living quarters (intimacy)",
+      "Hydroponics/gardens (life in death)",
+      "Engineering/repair bays (problem solving)",
+      "Observatory/windows (perspective, beauty)",
+      "Common areas (community)"
+    ],
+    "pacing": "Alternate between action/crisis and quiet character moments. Let relationship breathe.",
+    "sensory_details": "Emphasize touch, sound, light/shadow, temperature. Make the station feel real.",
+    "dialogue": "Keep natural, avoid exposition dumps. Show relationship through banter and pauses.",
+    "choice_design": "Offer continuations that reflect different emotional approaches - cautious, bold, vulnerable, playful, etc."
+  }
+}

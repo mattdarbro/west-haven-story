@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStory } from './hooks/useStory';
 import { StoryViewer } from './components/StoryViewer';
 import { Choice } from './types/story';
@@ -23,9 +23,13 @@ function App() {
     resetStory,
   } = useStory();
 
+  // Track if we've already started to prevent duplicate calls
+  const hasStarted = useRef(false);
+
   // Auto-start story if no session exists
   useEffect(() => {
-    if (!sessionId && !isLoading && !error) {
+    if (!sessionId && !isLoading && !error && !hasStarted.current) {
+      hasStarted.current = true;
       startStory('west_haven');
     }
   }, [sessionId, isLoading, error, startStory]);
@@ -47,9 +51,11 @@ function App() {
   };
 
   const handleReset = async () => {
+    hasStarted.current = false;
     resetStory();
     // Small delay to ensure state is cleared before starting new story
     await new Promise(resolve => setTimeout(resolve, 100));
+    hasStarted.current = true;
     await startStory('west_haven');
   };
 

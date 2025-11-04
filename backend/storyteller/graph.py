@@ -10,9 +10,9 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from backend.models.state import StoryState
 from backend.storyteller.nodes import (
-    retrieve_context_node,
     generate_narrative_node,
     parse_output_node,
+    generate_summary_node,
     generate_image_node,
     generate_audio_node,
     check_beat_complete_node,
@@ -29,16 +29,16 @@ def create_storyteller_graph(checkpointer: MemorySaver | None = None):
     Build the complete storytelling state machine.
 
     The workflow follows this pattern:
-    1. Retrieve context from story bible (RAG)
-    2. Generate narrative with LLM
-    3. Parse JSON output into structured data
+    1. Generate narrative with LLM (using world template + generated story bible)
+    2. Parse JSON output and extract story bible updates
+    3. Generate summary
     4. Conditionally generate media (image/audio)
     5. Check if beat is complete and advance if needed
     6. Deduct credits
     7. End
 
     Args:
-        checkpointer: Optional SqliteSaver for session persistence
+        checkpointer: Optional MemorySaver for session persistence
 
     Returns:
         Compiled LangGraph workflow
@@ -48,9 +48,9 @@ def create_storyteller_graph(checkpointer: MemorySaver | None = None):
 
     # ===== Add Nodes =====
 
-    workflow.add_node("retrieve_context", retrieve_context_node)
     workflow.add_node("generate_narrative", generate_narrative_node)
     workflow.add_node("parse_output", parse_output_node)
+    workflow.add_node("generate_summary", generate_summary_node)
     workflow.add_node("generate_image", generate_image_node)
     workflow.add_node("generate_audio", generate_audio_node)
     workflow.add_node("check_beat_complete", check_beat_complete_node)
@@ -58,23 +58,23 @@ def create_storyteller_graph(checkpointer: MemorySaver | None = None):
 
     # Error handling node
     workflow.add_node("handle_error", lambda state: {
-        "narrative_text": "The Citadel's magic shimmers and reforms...",
-        "choices": [{"id": 1, "text": "Try again", "consequence_hint": "Resume"}],
+        "narrative_text": "Something went wrong...",
+        "choices": [{"id": 1, "text": "She tried again, taking a deep breath as...", "tone": "cautious"}],
         "error": None  # Clear error after handling
     })
 
     # ===== Define Edges =====
 
-    # Entry point
-    workflow.set_entry_point("retrieve_context")
+    # Entry point - start with narrative generation (no RAG needed)
+    workflow.set_entry_point("generate_narrative")
 
     # Linear flow through core generation
-    workflow.add_edge("retrieve_context", "generate_narrative")
     workflow.add_edge("generate_narrative", "parse_output")
+    workflow.add_edge("parse_output", "generate_summary")
 
     # Conditional: Generate media or skip?
     workflow.add_conditional_edges(
-        "parse_output",
+        "generate_summary",
         should_generate_media,
         {
             "generate_media": "generate_image",

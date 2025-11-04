@@ -1,0 +1,39 @@
+{
+  "world_id": "west_haven",
+  "title": "West Haven: Romance on FS-7",
+  "description": "A romantic science fiction story about rediscovering hope and love on an abandoned space station",
+
+  "protagonist": {
+    "name": "Julia Martin",
+    "role": "protagonist",
+    "age": 32,
+    "occupation": "Senior Space Lawyer, Frontier Promise Corporation"
+  },
+
+  "narrative_style": {
+    "pov": "third person past tense",
+    "tone": "romantic with mystery elements",
+    "writing_style": "Show emotions through actions and sensory details, blend romance with sci-fi worldbuilding"
+  },
+
+  "starting_location": "Docking Bay",
+  "starting_beat": 1,
+
+  "credits": {
+    "starting": 25,
+    "per_turn_cost": 1
+  },
+
+  "voice_settings": {
+    "default_voice": "Jessica",
+    "protagonist_voice": "Jessica",
+    "narrator_voice": "Jessica"
+  },
+
+  "beats": {
+    "total": 12,
+    "act_1": [1, 2, 3, 4],
+    "act_2": [5, 6, 7, 8],
+    "act_3": [9, 10, 11, 12]
+  }
+}

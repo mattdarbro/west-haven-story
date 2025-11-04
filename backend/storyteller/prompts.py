@@ -8,44 +8,46 @@ from the story bible.
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
-def create_narrative_prompt(beat_number: int, beat_data: dict | None = None, world_id: str = "tfogwf") -> ChatPromptTemplate:
+def create_narrative_prompt(beat_number: int, beat_data: dict | None = None, metadata: dict | None = None) -> ChatPromptTemplate:
     """
     Create a beat-aware prompt for narrative generation.
 
     Args:
         beat_number: Current story beat (1-indexed)
         beat_data: Optional beat metadata from story bible
-        world_id: Story world identifier (affects point of view)
+        metadata: Story metadata (protagonist, POV, etc.) from metadata.json
 
     Returns:
         ChatPromptTemplate configured for this beat
     """
+    # Extract metadata
+    metadata = metadata or {}
+    protagonist_name = metadata.get("protagonist", {}).get("name", "the protagonist")
+    pov = metadata.get("narrative_style", {}).get("pov", "third person past tense")
+
     # Extract beat-specific guidance if available
     beat_goal = beat_data.get("goal", "Advance the story") if beat_data else "Advance the story"
     beat_tone = beat_data.get("tone", "balanced") if beat_data else "balanced"
-    
-    # World-specific character and POV settings
-    if world_id == "west_haven":
-        character_focus = beat_data.get("character_focus", "Julia Martin") if beat_data else "Julia Martin"
-        pov_instruction = 'Write in third person past tense ("Julia stood..." not "You stand..." or "I stand..."). Refer to the protagonist as Julia, she, or her.'
-        character_reference = "Julia"
-        story_title = "West Haven"
-    else:
-        # Default for tfogwf and others
-        character_focus = beat_data.get("character_focus", "Elena Storm") if beat_data else "Elena Storm"
-        pov_instruction = 'Write in second person present tense ("You awaken..." not "Elena awakens...")'
-        character_reference = "you"
-        story_title = "The Forgotten One Who Fell"
+    character_focus = beat_data.get("character_focus", protagonist_name) if beat_data else protagonist_name
 
-    system_message = f"""You are the master storyteller for "{story_title}," an interactive narrative.
+    system_message = f"""You are the master storyteller for an interactive narrative.
+
+PROTAGONIST: {protagonist_name}
+POINT OF VIEW: {pov}
 
 CURRENT BEAT: {beat_number}
 BEAT GOAL: {beat_goal}
 TONE: {beat_tone}
 CHARACTER FOCUS: {character_focus}
 
+CRITICAL INSTRUCTIONS:
+- Use the protagonist name ({protagonist_name}) consistently throughout
+- Write in {pov} as specified
+- DO NOT make up or change character names or story details
+- Use the Retrieved Context for additional story details, locations, and supporting characters
+
 STORYTELLING GUIDELINES:
-1. {pov_instruction}
+1. Follow the POV and writing style specified in the Retrieved Context
 2. Create vivid, sensory descriptions (sight, sound, touch, atmosphere)
 3. Show, don't tell - reveal character through action and dialogue
 4. Maintain tension and forward momentum
@@ -62,7 +64,7 @@ TONE GUIDANCE:
 - Balanced: Mix of the above as appropriate
 
 CHARACTER VOICE:
-{f'- {character_focus}\'s personality traits and motivations (see Retrieved Context for details)' if world_id == 'west_haven' else '- Determined but uncertain about her identity\n- Quick to sarcasm when nervous or scared\n- Resourceful and observant\n- Haunted by fragments of memories that aren\'t hers'}
+- Use {character_focus}'s personality traits and motivations from the Retrieved Context
 
 CRITICAL - RESPONSE FORMAT:
 You MUST respond with ONLY valid JSON containing these exact keys:
@@ -77,9 +79,8 @@ CHOICE DESIGN PRINCIPLES:
 - Offer meaningful variety (aggressive, cautious, clever)
 - No obviously "wrong" choices - all should be valid
 - Consequence hints should intrigue, not spoil
-- Choices should reflect {character_focus}'s character options
+- Choices should reflect {character_focus}'s character options and abilities from the story bible
 - Vary choice types: action, dialogue, investigation, moral decisions
-{f"- For West Haven: Focus on Julia's legal background, engineering knowledge, and emotional journey" if world_id == 'west_haven' else "- At least one choice should involve using magic/power"}
 
 BEAT PROGRESSION:
 - Set "beat_complete": true only when the beat's success criteria is clearly met
@@ -93,60 +94,59 @@ Retrieved Context will provide:
 - Relevant plot points and foreshadowing
 """
 
+    # Add story summary section (outside f-string to avoid variable substitution)
+    system_message += """
+
+STORY SO FAR (AI-generated summaries of recent events):
+{story_summary}
+
+Use the story summaries to maintain consistency and build on established events.
+"""
+
     return ChatPromptTemplate.from_messages([
         ("system", system_message),
         MessagesPlaceholder(variable_name="history"),
-        ("human", "{player_input}"),
-        ("system", "RETRIEVED CONTEXT FROM STORY BIBLE:\n{context}\n\nNow generate the next story segment as JSON.")
+        ("human", "RETRIEVED CONTEXT FROM STORY BIBLE:\n{context}\n\nPlayer Input: {player_input}\n\nNow generate the next story segment as JSON.")
     ])
 
 
-def create_opening_prompt(world_id: str) -> ChatPromptTemplate:
+def create_opening_prompt(metadata: dict | None = None) -> ChatPromptTemplate:
     """
     Create a special prompt for the story opening (Beat 1, first segment).
 
     Args:
-        world_id: Story world identifier
+        metadata: Story metadata (protagonist, POV, etc.) from metadata.json
 
     Returns:
         ChatPromptTemplate for opening
-    """
-    # World-specific opening instructions
-    if world_id == "west_haven":
-        story_name = "West Haven"
-        pov_instruction = "Write in third person past tense. Refer to the protagonist as Julia, she, or her."
-        opening_requirements = """- Start with Julia Martin crash-landing on FS-7 "West Haven"
-- Establish the orbital station setting and the "Unleavables" community
-- Show Julia's corporate lawyer background conflicting with her father's legacy
-- Create intrigue around the failing power systems and three-month deadline
-- Introduce the community's resourcefulness and resilience
-- End with a moment that establishes Julia's connection to her father's work"""
-    else:
-        story_name = "The Forgotten One Who Fell"
-        pov_instruction = "Write in second person present tense. Refer to the protagonist as you."
-        opening_requirements = """- Start with a strong sensory detail (cold stone, echoing silence, etc.)
-- Elena awakens in the Forgotten Citadel with fragmented memories
-- Establish she's drawn here by dreams she doesn't understand
-- Show (don't tell) that the Citadel responds to her presence
-- Create immediate intrigue with whispers or supernatural elements
-- End with discovery of something significant (the Crystal Spire)"""
 
-    system_message = f"""You are the master storyteller opening "{story_name}."
+    Note:
+        Protagonist name and POV come from metadata.json.
+        Additional story details are extracted from the Retrieved Context.
+    """
+    # Extract metadata
+    metadata = metadata or {}
+    protagonist_name = metadata.get("protagonist", {}).get("name", "the protagonist")
+    pov = metadata.get("narrative_style", {}).get("pov", "third person past tense")
+
+    system_message = f"""You are the master storyteller opening an interactive narrative.
+
+PROTAGONIST: {protagonist_name}
+POINT OF VIEW: {pov}
 
 This is the FIRST segment - the player has just started. Your goal is to:
 1. Immediately establish atmosphere and tension
-2. Introduce the protagonist in a compelling situation
+2. Introduce {protagonist_name} in a compelling situation
 3. Create questions that demand answers
 4. Set the tone for the story world
 5. Make the reader feel the character's situation and motivations
 
-POINT OF VIEW:
-{pov_instruction}
-
-OPENING SCENE REQUIREMENTS:
-{opening_requirements}
-
-Use the Retrieved Context about the world, characters, and Beat 1 objectives.
+CRITICAL INSTRUCTIONS:
+- Write in {pov} consistently
+- The protagonist is {protagonist_name} - use this name
+- Use the Retrieved Context for world details, locations, and supporting characters
+- Follow the opening scene requirements from Beat 1 in the Retrieved Context
+- DO NOT make up or change the established story details
 
 CRITICAL - RESPONSE FORMAT:
 You MUST respond with ONLY valid JSON containing these exact keys:
@@ -159,8 +159,7 @@ No other text. No markdown blocks. Just raw JSON.
 """
 
     return ChatPromptTemplate.from_messages([
-        ("system", system_message),
-        ("system", "RETRIEVED CONTEXT FROM STORY BIBLE:\n{context}\n\nGenerate the opening scene as JSON.")
+        ("system", system_message + "\n\nRETRIEVED CONTEXT FROM STORY BIBLE:\n{context}\n\nGenerate the opening scene as JSON.")
     ])
 
 
@@ -273,21 +272,22 @@ def format_conversation_history(messages: list) -> str:
 
 def extract_beat_metadata_from_context(context: str, beat_number: int) -> dict:
     """
-    Parse retrieved context to extract beat-specific metadata.
+    Parse retrieved RAG context to extract beat-specific metadata.
+
+    NOTE: This extracts ONLY beat-specific info from RAG context.
+    Protagonist name and POV come from metadata.json, NOT from this function.
 
     Args:
         context: Retrieved RAG context
         beat_number: Current beat number
 
     Returns:
-        Dictionary with beat metadata
+        Dictionary with beat-specific metadata (goal, tone)
     """
-    # This is a simple version - could be enhanced with better parsing
     metadata = {
         "beat_number": beat_number,
         "goal": "Advance the story",
-        "tone": "balanced",
-        "character_focus": "Elena Storm"
+        "tone": "balanced"
     }
 
     # Look for beat-specific information in context
@@ -298,10 +298,11 @@ def extract_beat_metadata_from_context(context: str, beat_number: int) -> dict:
             metadata["tone"] = "tense"
         elif "dark" in context.lower():
             metadata["tone"] = "dark"
+        elif "hopeful" in context.lower():
+            metadata["tone"] = "hopeful"
 
         # Extract goal if present
         if "Goal:" in context:
-            # Simple extraction - could be improved
             lines = context.split("\n")
             for i, line in enumerate(lines):
                 if "Goal:" in line and i + 1 < len(lines):

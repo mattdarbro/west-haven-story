@@ -10,66 +10,30 @@ import asyncio
 from typing import Any
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_anthropic import ChatAnthropic
-from langchain_openai import ChatOpenAI
 
 from backend.models.state import StoryState
-from backend.story_bible.rag import StoryWorldFactory
-from backend.storyteller.prompts import (
-    create_narrative_prompt,
+from backend.storyteller.prompts_v2 import (
+    load_world_template,
     create_opening_prompt,
-    format_conversation_history,
-    extract_beat_metadata_from_context
+    create_continuation_prompt
 )
 from backend.config import config
 
 
-# ===== Node 1: Retrieve Context from Story Bible =====
+# ===== Node 1: Generate Narrative =====
 
-async def retrieve_context_node(state: StoryState) -> dict[str, Any]:
+async def generate_narrative_node(state: StoryState) -> dict[str, Any]:
     """
-    Retrieve relevant context from story bible using RAG.
+    Generate story narrative using continuation-based prompts with world template.
 
     Args:
         state: Current story state
 
     Returns:
-        Updated state with retrieved_context populated
+        Updated state with narrative_text populated (raw JSON from LLM)
     """
     try:
-        # Get RAG instance for this world
-        rag = StoryWorldFactory.get_world(state["world_id"])
-
-        # Build query from recent messages and beat context
-        recent_input = state["messages"][-1].content if state["messages"] else "Start the story"
-        query = f"Beat {state['current_beat']}: {recent_input}"
-
-        # Retrieve context
-        context = await rag.aretrieve(query, beat_number=state["current_beat"])
-
-        return {"retrieved_context": context}
-
-    except Exception as e:
-        print(f"Error in retrieve_context_node: {e}")
-        return {
-            "retrieved_context": "Error retrieving context. Using minimal context.",
-            "error": str(e)
-        }
-
-
-# ===== Node 2: Generate Narrative =====
-
-async def generate_narrative_node(state: StoryState) -> dict[str, Any]:
-    """
-    Generate story narrative using LLM with RAG context.
-
-    Args:
-        state: Current story state with retrieved_context
-
-    Returns:
-        Updated state with narrative_text populated (raw LLM response)
-    """
-    try:
-        # Initialize LLM - use Claude for better narrative consistency
+        # Initialize LLM
         llm = ChatAnthropic(
             model=config.MODEL_NAME,
             temperature=config.TEMPERATURE,
@@ -77,34 +41,43 @@ async def generate_narrative_node(state: StoryState) -> dict[str, Any]:
             anthropic_api_key=config.ANTHROPIC_API_KEY,
         )
 
+        # Load world template
+        world_template = load_world_template(state["world_id"])
+
         # Determine if this is the opening
         is_opening = len(state["messages"]) == 0
 
         # Select appropriate prompt
         if is_opening:
-            prompt = create_opening_prompt(state["world_id"])
-            messages = prompt.format_messages(context=state["retrieved_context"])
+            # Opening: Claude creates protagonist, scene, and initial story bible
+            prompt = create_opening_prompt(world_template)
+            messages = prompt.format_messages()
+            print(f"✓ Generating opening narrative for beat {state['current_beat']}")
+
         else:
-            # Extract beat metadata from context
-            beat_metadata = extract_beat_metadata_from_context(
-                state["retrieved_context"],
-                state["current_beat"]
+            # Continuation: Claude continues from last choice
+            last_choice_continuation = state.get("last_choice_continuation", "")
+
+            if not last_choice_continuation:
+                # Fallback if continuation not set (shouldn't happen)
+                last_choice_continuation = state["messages"][-1].content if state["messages"] else "Continue the story"
+
+            prompt = create_continuation_prompt(
+                world_template=world_template,
+                beat_number=state["current_beat"],
+                turns_in_beat=state.get("turns_in_beat", 0),
+                last_choice_continuation=last_choice_continuation,
+                generated_story_bible=state.get("generated_story_bible", {}),
+                story_summary=state.get("story_summary", [])
             )
 
-            prompt = create_narrative_prompt(
-                state["current_beat"], 
-                beat_metadata,
-                world_id=state["world_id"]
-            )
-
-            # Get player's last input
-            player_input = state["messages"][-1].content if state["messages"] else "Begin"
-
+            # Include message history for context (but prompt already has summary)
             messages = prompt.format_messages(
-                history=state["messages"][:-1] if len(state["messages"]) > 1 else [],
-                player_input=player_input,
-                context=state["retrieved_context"]
+                history=state["messages"][-6:] if len(state["messages"]) > 6 else state["messages"],
+                last_choice=last_choice_continuation
             )
+
+            print(f"✓ Generating continuation for beat {state['current_beat']}, turn {state.get('turns_in_beat', 0) + 1}")
 
         # Generate narrative
         response = await llm.ainvoke(messages)
@@ -116,32 +89,36 @@ async def generate_narrative_node(state: StoryState) -> dict[str, Any]:
 
     except Exception as e:
         print(f"Error in generate_narrative_node: {e}")
+        import traceback
+        traceback.print_exc()
+
         return {
             "narrative_text": json.dumps({
-                "narrative": "The Citadel's magic flickers and distorts. Something went wrong in the weaving of this tale.",
+                "narrative": "Something went wrong in the weaving of this tale. The station's systems flicker momentarily...",
                 "choices": [
-                    {"id": 1, "text": "Try again", "consequence_hint": "Resume the story"},
-                    {"id": 2, "text": "Take a different path", "consequence_hint": "Alternative approach"},
-                    {"id": 3, "text": "Pause and reflect", "consequence_hint": "Gather your thoughts"}
+                    {"id": 1, "text": "She took a deep breath and tried again, steadying herself as...", "tone": "cautious"},
+                    {"id": 2, "text": "She pushed forward anyway, determined not to let this stop her from...", "tone": "bold"},
+                    {"id": 3, "text": "She paused, taking a moment to gather her thoughts before...", "tone": "thoughtful"}
                 ],
-                "image_prompt": "Magical distortion, reality flickering, dark fantasy",
-                "beat_complete": False
+                "image_prompt": "Space station interior, flickering lights, sci-fi atmosphere",
+                "story_bible_update": {},
+                "beat_progress": state.get("beat_progress_score", 0.0)
             }),
             "error": str(e)
         }
 
 
-# ===== Node 3: Parse LLM Output =====
+# ===== Node 2: Parse LLM Output =====
 
 def parse_output_node(state: StoryState) -> dict[str, Any]:
     """
-    Parse JSON output from LLM into structured data.
+    Parse JSON output from LLM and update generated story bible.
 
     Args:
         state: Current story state with narrative_text (JSON string)
 
     Returns:
-        Updated state with parsed choices, image_prompt, etc.
+        Updated state with parsed narrative, choices, story_bible_update, beat_progress
     """
     try:
         # Parse JSON from LLM response
@@ -153,18 +130,134 @@ def parse_output_node(state: StoryState) -> dict[str, Any]:
         elif "```" in narrative_text:
             narrative_text = narrative_text.split("```")[1].split("```")[0]
 
-        data = json.loads(narrative_text.strip())
+        # Clean up the text
+        narrative_text = narrative_text.strip()
+
+        # Handle "extra data" after JSON by extracting only the JSON object
+        # Count braces to find the complete JSON object
+        if narrative_text.startswith('{'):
+            brace_count = 0
+            json_end = 0
+            for i, char in enumerate(narrative_text):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        json_end = i + 1
+                        break
+
+            if json_end > 0 and json_end < len(narrative_text):
+                # There's extra data after the JSON
+                extra_data = narrative_text[json_end:].strip()
+                if extra_data:
+                    print(f"⚠️  Found extra data after JSON ({len(extra_data)} chars), truncating...")
+                narrative_text = narrative_text[:json_end]
+
+        # Try to parse JSON
+        try:
+            data = json.loads(narrative_text)
+        except json.JSONDecodeError as e:
+            # If JSON has control characters, try to fix them
+            print(f"Initial JSON parse failed: {e}")
+            print(f"Attempting to fix control characters...")
+
+            # Fix common control character issues in JSON strings
+            # This handles unescaped newlines, tabs, etc. within string values
+            import re
+
+            def escape_in_strings(match):
+                """Escape control characters within JSON string values."""
+                s = match.group(1)
+                # Escape backslashes first
+                s = s.replace('\\', '\\\\')
+                # Escape control characters
+                s = s.replace('\n', '\\n')
+                s = s.replace('\r', '\\r')
+                s = s.replace('\t', '\\t')
+                s = s.replace('\b', '\\b')
+                s = s.replace('\f', '\\f')
+                return '"' + s + '"'
+
+            # Find all string values and escape control characters
+            fixed_text = re.sub(r'"([^"\\]*(?:\\.[^"\\]*)*)"', escape_in_strings, narrative_text)
+
+            try:
+                data = json.loads(fixed_text)
+                print(f"✓ Successfully parsed JSON after fixing control characters")
+            except json.JSONDecodeError as e2:
+                # Still failed, try regex extraction
+                print(f"Still failed after fix: {e2}")
+                print(f"Attempting targeted narrative extraction...")
+
+                # Use a more precise regex that stops at the closing quote followed by comma
+                # This matches: "narrative": "..." where ... can contain escaped quotes
+                narrative_match = re.search(r'"narrative"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,', narrative_text, re.DOTALL)
+
+                if narrative_match:
+                    narrative = narrative_match.group(1)
+                    # Unescape the extracted text
+                    narrative = narrative.replace('\\n', '\n').replace('\\r', '\r').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
+                    print(f"✓ Extracted narrative from malformed JSON (length: {len(narrative)})")
+
+                    # Return with default continuation-style choices
+                    return {
+                        "narrative_text": narrative,
+                        "choices": [
+                            {"id": 1, "text": "She took a moment to gather her thoughts before...", "tone": "cautious"},
+                            {"id": 2, "text": "She pushed forward, determined to...", "tone": "bold"},
+                            {"id": 3, "text": "She paused, considering her options as...", "tone": "thoughtful"}
+                        ],
+                        "image_prompt": None,
+                        "messages": state["messages"]
+                    }
+                else:
+                    # Really couldn't parse - re-raise
+                    print(f"✗ Could not extract narrative from malformed JSON")
+                    raise
 
         # Extract components
         narrative = data.get("narrative", "")
         choices = data.get("choices", [])
         image_prompt = data.get("image_prompt")
-        beat_complete = data.get("beat_complete", False)
+        story_bible_update = data.get("story_bible_update", {})
+        beat_progress_score = data.get("beat_progress", state.get("beat_progress_score", 0.0))
 
-        # Update beat progress if complete
+        # Validate choices
+        if not choices or not isinstance(choices, list):
+            choices = [
+                {"id": 1, "text": "She continued forward, stepping into...", "tone": "neutral"},
+                {"id": 2, "text": "She hesitated, then carefully approached...", "tone": "cautious"},
+                {"id": 3, "text": "She smiled despite herself and...", "tone": "hopeful"}
+            ]
+
+        # Merge story_bible_update into generated_story_bible
+        generated_story_bible = state.get("generated_story_bible", {}).copy()
+
+        # Deep merge the update (supports nested dicts and lists)
+        def deep_merge(base: dict, update: dict) -> dict:
+            """Recursively merge update into base."""
+            result = base.copy()
+            for key, value in update.items():
+                if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                    result[key] = deep_merge(result[key], value)
+                elif key in result and isinstance(result[key], list) and isinstance(value, list):
+                    # For lists, extend rather than replace
+                    result[key] = result[key] + value
+                else:
+                    result[key] = value
+            return result
+
+        generated_story_bible = deep_merge(generated_story_bible, story_bible_update)
+
+        # Check if beat is complete based on progress score
         beat_progress = state.get("beat_progress", {}).copy()
-        if beat_complete:
+        if beat_progress_score >= 1.0:
             beat_progress[state["current_beat"]] = True
+            print(f"✓ Beat {state['current_beat']} completed (progress: {beat_progress_score})")
+
+        # Increment turns in beat
+        turns_in_beat = state.get("turns_in_beat", 0) + 1
 
         # Add AI message to history
         messages = state["messages"].copy()
@@ -174,7 +267,10 @@ def parse_output_node(state: StoryState) -> dict[str, Any]:
             "narrative_text": narrative,  # Now just the text, not JSON
             "choices": choices,
             "image_prompt": image_prompt,
+            "generated_story_bible": generated_story_bible,
+            "beat_progress_score": beat_progress_score,
             "beat_progress": beat_progress,
+            "turns_in_beat": turns_in_beat,
             "messages": messages
         }
 
@@ -186,9 +282,9 @@ def parse_output_node(state: StoryState) -> dict[str, Any]:
         return {
             "narrative_text": state["narrative_text"],
             "choices": [
-                {"id": 1, "text": "Continue", "consequence_hint": "Move forward"},
-                {"id": 2, "text": "Investigate", "consequence_hint": "Look closer"},
-                {"id": 3, "text": "Be cautious", "consequence_hint": "Careful approach"}
+                {"id": 1, "text": "She decided to continue, moving forward as...", "tone": "determined"},
+                {"id": 2, "text": "She took a different approach, carefully...", "tone": "cautious"},
+                {"id": 3, "text": "She paused to think it through before...", "tone": "thoughtful"}
             ],
             "image_prompt": None,
             "error": f"Failed to parse LLM output: {str(e)}"
@@ -196,10 +292,81 @@ def parse_output_node(state: StoryState) -> dict[str, Any]:
 
     except Exception as e:
         print(f"Error in parse_output_node: {e}")
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}
 
 
-# ===== Node 4: Generate Image (Optional) =====
+# ===== Node 4: Generate Story Summary =====
+
+async def generate_summary_node(state: StoryState) -> dict[str, Any]:
+    """
+    Generate a 2-3 sentence summary of what just happened for story coherence.
+
+    This summary helps maintain narrative consistency across multiple turns
+    by providing concise context about recent events.
+
+    Args:
+        state: Current story state with new narrative
+
+    Returns:
+        Updated state with appended story_summary
+    """
+    try:
+        # Get the current narrative that was just generated
+        current_narrative = state["narrative_text"]
+
+        # Get the player's last choice (if any)
+        player_choice = ""
+        if len(state["messages"]) >= 2:
+            # Messages should have player's choice as the last human message
+            player_choice = state["messages"][-2].content if state["messages"][-2].type == "human" else ""
+
+        # Build summary prompt
+        summary_prompt = f"""Based on this story segment, create a concise 2-3 sentence summary of what just happened.
+Focus on:
+- Key actions taken
+- Important discoveries or revelations
+- Character decisions and their immediate consequences
+- Changes in the situation or environment
+
+Story segment:
+{current_narrative}
+
+Player's choice: {player_choice if player_choice else "Story opening"}
+
+Respond with ONLY the summary, no additional text or explanation."""
+
+        # Use Claude to generate summary
+        llm = ChatAnthropic(
+            model=config.MODEL_NAME,
+            temperature=0.3,  # Lower temperature for more focused summaries
+            max_tokens=150,   # Keep summaries concise
+            anthropic_api_key=config.ANTHROPIC_API_KEY,
+        )
+
+        response = await llm.ainvoke([HumanMessage(content=summary_prompt)])
+        summary = response.content.strip()
+
+        # Add to story_summary list
+        story_summary = state.get("story_summary", []).copy()
+        story_summary.append(summary)
+
+        # Keep only last 10 summaries to avoid token bloat
+        if len(story_summary) > 10:
+            story_summary = story_summary[-10:]
+
+        print(f"✓ Generated story summary: {summary[:100]}...")
+
+        return {"story_summary": story_summary}
+
+    except Exception as e:
+        print(f"Error in generate_summary_node: {e}")
+        # Don't fail the whole flow if summary fails
+        return {"story_summary": state.get("story_summary", [])}
+
+
+# ===== Node 5: Generate Image (Optional) =====
 
 async def generate_image_node(state: StoryState) -> dict[str, Any]:
     """
@@ -252,19 +419,26 @@ async def generate_image_node(state: StoryState) -> dict[str, Any]:
 
             print(f"Generating image with model: {model}")
 
-            # Run Stable Diffusion XL
-            output = await client.async_run(
-                model,
-                input={
-                    "prompt": enhanced_prompt,
-                    "width": config.IMAGE_WIDTH,
-                    "height": config.IMAGE_HEIGHT,
-                    "num_outputs": 1,
-                    "negative_prompt": "text, watermark, low quality, blurry, distorted, ugly",
-                    "guidance_scale": 7.5,
-                    "num_inference_steps": 25
-                }
-            )
+            # Determine parameters based on model
+            input_params = {
+                "prompt": enhanced_prompt,
+                "width": config.IMAGE_WIDTH,
+                "height": config.IMAGE_HEIGHT,
+                "num_outputs": 1,
+            }
+
+            # Flux Schnell has different parameters than SDXL
+            if "flux-schnell" in model.lower():
+                # Flux Schnell parameters (max 4 steps)
+                input_params["num_inference_steps"] = 4
+            else:
+                # SDXL or other models
+                input_params["negative_prompt"] = "text, watermark, low quality, blurry, distorted, ugly"
+                input_params["guidance_scale"] = 7.5
+                input_params["num_inference_steps"] = 25
+
+            # Run image generation
+            output = await client.async_run(model, input=input_params)
 
             replicate_output = output[0] if output else None
             if not replicate_output:
@@ -439,7 +613,7 @@ def check_beat_complete_node(state: StoryState) -> dict[str, Any]:
         state: Current story state
 
     Returns:
-        Updated state with potentially incremented current_beat
+        Updated state with potentially incremented current_beat and reset turns_in_beat
     """
     beat_progress = state.get("beat_progress", {})
     current_beat = state["current_beat"]
@@ -452,7 +626,9 @@ def check_beat_complete_node(state: StoryState) -> dict[str, Any]:
         print(f"✓ Beat {current_beat} completed! Advancing to Beat {next_beat}")
 
         return {
-            "current_beat": next_beat
+            "current_beat": next_beat,
+            "turns_in_beat": 0,  # Reset turns counter for new beat
+            "beat_progress_score": 0.0  # Reset progress score for new beat
         }
 
     # Beat not complete, continue current beat

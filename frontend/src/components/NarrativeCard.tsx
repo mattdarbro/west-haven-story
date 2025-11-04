@@ -10,14 +10,24 @@ interface NarrativeCardProps {
   className?: string;
 }
 
-export function NarrativeCard({ 
-  narrative, 
-  currentBeat, 
+// Helper to get full media URLs from backend
+const getMediaUrl = (url?: string) => {
+  if (!url) return undefined;
+  // If URL is already absolute, return as-is
+  if (url.startsWith('http')) return url;
+  // Otherwise prepend backend URL
+  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  return `${backendUrl}${url}`;
+};
+
+export function NarrativeCard({
+  narrative,
+  currentBeat,
   imageUrl,
   audioUrl,
   isGeneratingAudio = false,
   isGeneratingImage = false,
-  className = '' 
+  className = ''
 }: NarrativeCardProps) {
   return (
     <div className={`relative ${className}`}>
@@ -43,12 +53,12 @@ export function NarrativeCard({
         <div className="mb-6">
           {imageUrl ? (
             <div className="relative rounded-lg overflow-hidden group">
-              <img 
-                src={imageUrl} 
-                alt="Story scene" 
+              <img
+                src={getMediaUrl(imageUrl)}
+                alt="Story scene"
                 className="w-full h-48 object-cover transition-all duration-300 group-hover:scale-105"
                 onLoad={() => console.log('Image loaded successfully')}
-                onError={() => console.log('Image failed to load')}
+                onError={(e) => console.log('Image failed to load:', e)}
               />
               {/* Hover overlay for zoom effect */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center">
@@ -105,7 +115,7 @@ export function NarrativeCard({
         {(audioUrl || isGeneratingAudio) && (
           <div className="mt-6">
             <AudioPlayer
-              audioUrl={audioUrl}
+              audioUrl={getMediaUrl(audioUrl)}
               isLoading={isGeneratingAudio}
               autoPlay={false}
             />

@@ -24,14 +24,21 @@ class StoryState(TypedDict):
     # ===== Core Narrative State =====
     messages: Annotated[list[BaseMessage], "Conversation history between user and AI"]
     current_beat: Annotated[int, "Current story beat (1-indexed)"]
+    turns_in_beat: Annotated[int, "Number of turns completed in current beat"]
+    beat_progress_score: Annotated[float, "Progress through current beat (0.0-1.0)"]
     beat_progress: Annotated[dict[int, bool], "Completion status for each beat"]
+    story_summary: Annotated[list[str], "AI-generated summaries of key events (2-3 sentences each)"]
 
-    # ===== Context Retrieval =====
-    retrieved_context: Annotated[str, "RAG-retrieved lore from story bible"]
+    # ===== Generated Story Bible (Dynamic) =====
+    generated_story_bible: Annotated[dict, "Claude-generated story details (characters, locations, events)"]
+    last_choice_continuation: Annotated[str | None, "The continuation text from last selected choice"]
+
+    # ===== Temporary (for backwards compatibility) =====
+    retrieved_context: Annotated[str, "RAG-retrieved lore from story bible (deprecated, use generated_story_bible)"]
 
     # ===== Generated Content =====
     narrative_text: Annotated[str, "Current story segment text"]
-    choices: Annotated[list[dict], "Available player choices with metadata"]
+    choices: Annotated[list[dict], "Available player choices with continuation text"]
     image_prompt: Annotated[str | None, "Prompt for image generation"]
     image_url: Annotated[str | None, "Generated image URL"]
     audio_url: Annotated[str | None, "Generated audio URL"]
@@ -51,11 +58,12 @@ class StoryState(TypedDict):
 # ===== Pydantic Models for API Validation =====
 
 class Choice(BaseModel):
-    """A single player choice option."""
+    """A single player choice option with continuation."""
 
     id: int = Field(..., ge=1, description="Unique choice identifier")
-    text: str = Field(..., min_length=1, max_length=500, description="Choice text displayed to player")
-    consequence_hint: str = Field(..., max_length=200, description="Hint about choice outcome")
+    text: str = Field(..., min_length=1, max_length=1000, description="Choice continuation text (starts next segment)")
+    tone: str = Field(default="", max_length=50, description="Emotional tone of this choice")
+    consequence_hint: str = Field(default="", max_length=200, description="Optional hint about choice outcome")
 
 
 class StartStoryRequest(BaseModel):
@@ -185,8 +193,20 @@ def create_initial_state(
     return StoryState(
         messages=[],
         current_beat=1,
+        turns_in_beat=0,
+        beat_progress_score=0.0,
         beat_progress={},
-        retrieved_context="",
+        story_summary=[],
+        generated_story_bible={
+            "protagonist": {},
+            "love_interest": {},
+            "supporting_characters": {},
+            "locations": {},
+            "key_events": [],
+            "relationships": {}
+        },
+        last_choice_continuation=None,
+        retrieved_context="",  # Backwards compatibility
         narrative_text="",
         choices=[],
         image_prompt=None,
@@ -205,5 +225,6 @@ def format_choice_for_api(choice_dict: dict) -> Choice:
     return Choice(
         id=choice_dict["id"],
         text=choice_dict["text"],
+        tone=choice_dict.get("tone", ""),
         consequence_hint=choice_dict.get("consequence_hint", "")
     )
