@@ -261,6 +261,14 @@ class AppConfig(BaseSettings):
 # Import this in other modules: from backend.config import config
 config = AppConfig()
 
+# Disable LangSmith tracing if not properly configured
+# This prevents 401 errors when LANGCHAIN_API_KEY is missing
+if config.LANGCHAIN_TRACING_V2 and not config.LANGCHAIN_API_KEY:
+    print("⚠️  LangSmith tracing is enabled but LANGCHAIN_API_KEY is missing. Disabling tracing.")
+    import os
+    os.environ["LANGCHAIN_TRACING_V2"] = "false"
+    config.LANGCHAIN_TRACING_V2 = False
+
 
 # Validation on startup
 if __name__ == "__main__":
