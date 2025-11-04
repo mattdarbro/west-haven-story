@@ -236,25 +236,45 @@ def parse_output_node(state: StoryState) -> dict[str, Any]:
         for i, choice in enumerate(choices):
             if not isinstance(choice, dict):
                 # Skip invalid choice
+                print(f"⚠️  Skipping non-dict choice at index {i}")
                 continue
 
+            # Create a clean copy to avoid mutation issues
+            validated_choice = {}
+
             # Ensure choice has proper ID (should be 1, 2, or 3)
-            # Fix if ID is missing, wrong type, or incorrect value
+            # Always use index-based ID to guarantee correctness
             expected_id = i + 1
-            if choice.get("id") != expected_id:
-                print(f"⚠️  Fixing choice {i}: id was {choice.get('id')}, setting to {expected_id}")
-                choice["id"] = expected_id
+            original_id = choice.get("id")
+
+            # Convert string IDs to integers if needed
+            if isinstance(original_id, str) and original_id.isdigit():
+                original_id = int(original_id)
+
+            if original_id != expected_id:
+                print(f"⚠️  Fixing choice {i}: id was {repr(original_id)} (type: {type(original_id).__name__}), setting to {expected_id}")
+
+            validated_choice["id"] = expected_id
 
             # Ensure choice has text
-            if not choice.get("text"):
+            text = choice.get("text", "").strip()
+            if not text:
                 print(f"⚠️  Warning: choice {expected_id} has no text, using fallback")
-                choice["text"] = f"She paused, considering what to do next as..."
+                text = f"She paused, considering what to do next as..."
+            validated_choice["text"] = text
 
             # Ensure choice has tone
-            if not choice.get("tone"):
-                choice["tone"] = "neutral"
+            tone = choice.get("tone", "").strip()
+            if not tone:
+                tone = "neutral"
+            validated_choice["tone"] = tone
 
-            validated_choices.append(choice)
+            # Copy over consequence_hint if it exists
+            if choice.get("consequence_hint"):
+                validated_choice["consequence_hint"] = choice["consequence_hint"]
+
+            validated_choices.append(validated_choice)
+            print(f"✓ Validated choice {expected_id}: text='{text[:50]}...', tone={tone}")
 
         # If we don't have exactly 3 choices, use fallback
         if len(validated_choices) != 3:

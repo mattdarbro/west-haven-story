@@ -200,24 +200,38 @@ async def continue_story(request: ContinueStoryRequest):
         selected_choice = None
 
         # Debug logging
-        print(f"🔍 DEBUG: Received choice_id = {request.choice_id} (type: {type(request.choice_id)})")
-        print(f"🔍 DEBUG: Previous choices count = {len(previous_choices)}")
+        print(f"\n{'='*70}")
+        print(f"DEBUG: CONTINUE STORY REQUEST")
+        print(f"{'='*70}")
+        print(f"🔍 Session ID: {request.session_id}")
+        print(f"🔍 Requested choice_id: {request.choice_id} (type: {type(request.choice_id).__name__})")
+        print(f"🔍 Previous choices count: {len(previous_choices)}")
+        print(f"\nPrevious choices in state:")
         for i, choice in enumerate(previous_choices):
-            print(f"🔍 DEBUG: Choice {i}: id={choice.get('id')} (type: {type(choice.get('id'))}), text={choice.get('text', '')[:50]}...")
+            choice_id = choice.get('id')
+            choice_text = choice.get('text', '')[:50]
+            print(f"  [{i}] id={choice_id} (type: {type(choice_id).__name__})")
+            print(f"      text='{choice_text}...'")
+            print(f"      Match? {choice_id == request.choice_id} (strict), {str(choice_id) == str(request.choice_id)} (as strings)")
 
+        # Try to find the choice
         for choice in previous_choices:
             if choice.get("id") == request.choice_id:
                 selected_choice = choice
                 break
 
         if not selected_choice:
-            print(f"❌ DEBUG: Could not find choice with id={request.choice_id}")
+            print(f"\n❌ DEBUG: Could not find choice with id={request.choice_id}")
+            print(f"Available IDs: {[c.get('id') for c in previous_choices]}")
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid choice ID: {request.choice_id}"
+                detail=f"Invalid choice ID: {request.choice_id}. Available: {[c.get('id') for c in previous_choices]}"
             )
 
-        print(f"✓ DEBUG: Found selected choice: {selected_choice.get('text', '')[:50]}...")
+        print(f"\n✓ DEBUG: Found selected choice:")
+        print(f"  ID: {selected_choice.get('id')}")
+        print(f"  Text: {selected_choice.get('text', '')[:100]}...")
+        print(f"{'='*70}\n")
 
         # Extract the continuation text
         choice_continuation = selected_choice.get("text", "")
