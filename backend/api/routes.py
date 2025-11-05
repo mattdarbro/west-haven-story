@@ -74,13 +74,13 @@ async def initialize_story_graph():
             print(f"   Directory writable: {os.access(db_dir, os.W_OK)}")
             print(f"   Directory executable: {os.access(db_dir, os.X_OK)}")
 
-            # Create async checkpointer using absolute path
+            # Create async checkpointer - pass file path directly (not URI)
             from backend.storyteller.graph import create_storyteller_graph
 
-            db_uri = f"sqlite:///{db_file.absolute()}"
-            print(f"📝 Creating checkpointer with URI: {db_uri}")
+            db_path_str = str(db_file.absolute())
+            print(f"📝 Creating checkpointer with path: {db_path_str}")
 
-            checkpointer_cm = AsyncSqliteSaver.from_conn_string(db_uri)
+            checkpointer_cm = AsyncSqliteSaver.from_conn_string(db_path_str)
             story_graph_checkpointer = await checkpointer_cm.__aenter__()
 
             # Create the graph with the checkpointer directly
@@ -137,11 +137,11 @@ async def get_story_graph():
                 print(f"   Database file does not exist yet (will be created)")
 
             # Initialize async checkpointer (we're already in async context)
-            # Use absolute path for SQLite
-            db_uri = f"sqlite:///{db_file.absolute()}"
-            print(f"📝 Creating checkpointer with URI: {db_uri}")
+            # Pass file path directly (not URI) - aiosqlite handles it
+            db_path_str = str(db_file.absolute())
+            print(f"📝 Creating checkpointer with path: {db_path_str}")
 
-            checkpointer_cm = AsyncSqliteSaver.from_conn_string(db_uri)
+            checkpointer_cm = AsyncSqliteSaver.from_conn_string(db_path_str)
             story_graph_checkpointer = await checkpointer_cm.__aenter__()
 
             # Create the graph with the checkpointer directly
