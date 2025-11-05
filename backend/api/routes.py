@@ -48,7 +48,7 @@ def get_story_graph():
     global story_graph
     if story_graph is None:
         try:
-            story_graph = create_persistent_graph()
+            story_graph = create_persistent_graph(db_path=config.CHECKPOINT_DB_PATH)
         except Exception as e:
             print(f"⚠️  Error creating story graph: {e}")
             raise
@@ -169,17 +169,7 @@ async def continue_story(request: ContinueStoryRequest):
     Processes the selected choice and generates the next story segment.
     """
     try:
-        # Validate session exists
-        if request.session_id not in active_sessions:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Session not found: {request.session_id}"
-            )
-
-        # Update last access
-        active_sessions[request.session_id]["last_access"] = datetime.utcnow().isoformat()
-
-        # Load previous state from checkpoint to get the choice text
+        # Load previous state from checkpoint (source of truth)
         graph = get_story_graph()
         config_dict = {"configurable": {"thread_id": request.session_id}}
 
@@ -190,8 +180,23 @@ async def continue_story(request: ContinueStoryRequest):
         if not checkpoint:
             raise HTTPException(
                 status_code=404,
-                detail="No previous state found for session"
+                detail=f"Session not found: {request.session_id}. The session may have expired or the server was restarted."
             )
+
+        # If checkpoint exists but active_sessions doesn't have it, restore it
+        # (This can happen after Railway redeploys)
+        if request.session_id not in active_sessions:
+            print(f"⚠️  Restoring session {request.session_id} from checkpoint (was missing from active_sessions)")
+            previous_state = checkpoint["channel_values"]
+            active_sessions[request.session_id] = {
+                "user_id": previous_state.get("user_id", "unknown"),
+                "world_id": previous_state.get("world_id", "unknown"),
+                "created_at": previous_state.get("session_start", datetime.utcnow().isoformat()),
+                "last_access": datetime.utcnow().isoformat()
+            }
+
+        # Update last access
+        active_sessions[request.session_id]["last_access"] = datetime.utcnow().isoformat()
 
         previous_state = checkpoint["channel_values"]
 

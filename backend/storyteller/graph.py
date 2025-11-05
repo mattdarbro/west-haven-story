@@ -7,6 +7,7 @@ the storytelling process from user input to final response.
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 
 from backend.models.state import StoryState
 from backend.storyteller.nodes import (
@@ -105,15 +106,27 @@ def create_storyteller_graph(checkpointer: MemorySaver | None = None):
 
 def create_persistent_graph(db_path: str = "story_checkpoints.db"):
     """
-    Create a graph with memory persistence.
+    Create a graph with SQLite persistence.
 
     Args:
-        db_path: Not used with MemorySaver (kept for API compatibility)
+        db_path: Path to SQLite database file for checkpointing
 
     Returns:
         Compiled graph with checkpointing enabled
     """
-    checkpointer = MemorySaver()
+    # Use SqliteSaver for persistent storage that survives restarts
+    import sqlite3
+    from pathlib import Path
+
+    # Ensure database directory exists
+    db_file = Path(db_path)
+    db_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create SQLite connection
+    conn = sqlite3.connect(str(db_file), check_same_thread=False)
+    checkpointer = SqliteSaver(conn)
+
+    print(f"✓ Using SQLite checkpointer: {db_path}")
     return create_storyteller_graph(checkpointer=checkpointer)
 
 

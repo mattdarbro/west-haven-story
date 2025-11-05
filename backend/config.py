@@ -79,6 +79,11 @@ class AppConfig(BaseSettings):
         description="Database URL for session persistence"
     )
 
+    CHECKPOINT_DB_PATH: str = Field(
+        default="./story_checkpoints.db",
+        description="Path to SQLite database for LangGraph checkpoints"
+    )
+
     # ===== Story Settings =====
     DEFAULT_WORLD: str = Field(
         default="west_haven",
