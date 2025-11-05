@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { StoryState, Choice } from '../types/story';
-import { api, ApiError } from '../services/api';
+import { api } from '../services/api';
 import { useStoryStream } from './useStoryStream';
 
 const STORAGE_KEY = 'storyteller_session';
@@ -32,7 +32,7 @@ export function useStory() {
     setState(prev => ({ ...prev, isLoading: true, error: null, narrative: '', choices: [] }));
 
     // Use streaming for immersive experience
-    const cancelFn = api.streamStartStory(
+    api.streamStartStory(
       { world_id: worldId },
       (event) => {
         switch (event.type) {
