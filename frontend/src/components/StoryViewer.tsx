@@ -16,7 +16,7 @@ interface StoryViewerProps {
 }
 
 // Delay before showing choices (in milliseconds)
-const CHOICE_DELAY_MS = 45000; // 45 seconds
+const CHOICE_DELAY_MS = 15000; // 15 seconds
 
 export function StoryViewer({
   state,
