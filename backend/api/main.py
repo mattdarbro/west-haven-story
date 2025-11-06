@@ -65,11 +65,13 @@ else:
     print("⚠️  Skipping routes registration due to initialization failure")
 
 # Mount static files for generated media
-if os.path.exists("./generated_audio"):
-    app.mount("/audio", StaticFiles(directory="./generated_audio"), name="audio")
+# Create directories if they don't exist
+os.makedirs("./generated_audio", exist_ok=True)
+os.makedirs("./generated_images", exist_ok=True)
 
-if os.path.exists("./generated_images"):
-    app.mount("/images", StaticFiles(directory="./generated_images"), name="images")
+# Mount the directories
+app.mount("/audio", StaticFiles(directory="./generated_audio"), name="audio")
+app.mount("/images", StaticFiles(directory="./generated_images"), name="images")
 
 
 # ===== Root Endpoint =====
