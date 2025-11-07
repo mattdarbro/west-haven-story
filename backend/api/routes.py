@@ -223,7 +223,8 @@ async def start_story(request: StartStoryRequest):
         initial_state = create_initial_state(
             user_id=user_id,
             world_id=request.world_id,
-            credits=config.CREDITS_PER_NEW_USER
+            credits=config.CREDITS_PER_NEW_USER,
+            total_chapters=config.TOTAL_CHAPTERS
         )
 
         # Run first turn (opening narrative)
