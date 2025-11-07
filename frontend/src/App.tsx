@@ -15,8 +15,6 @@ function App() {
     error,
     imageUrl,
     audioUrl,
-    isStreaming,
-    streamError,
     startStory,
     continueStory,
     clearError,
@@ -114,8 +112,6 @@ function App() {
             error,
             imageUrl,
             audioUrl,
-            isStreaming,
-            streamError,
           }}
           onChoiceSelect={handleChoiceSelect}
           onRetry={handleRetry}
