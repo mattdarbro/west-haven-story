@@ -100,8 +100,17 @@ async def generate_narrative_node(state: StoryState) -> dict[str, Any]:
         # Generate narrative
         response = await llm.ainvoke(messages)
 
-        # Debug: print first 200 chars
-        print(f"LLM Response (first 200 chars): {response.content[:200]}")
+        # Debug: print response statistics
+        response_text = response.content
+        word_count = len(response_text.split())
+        char_count = len(response_text)
+        print(f"\n📊 LLM Response Statistics:")
+        print(f"   Characters: {char_count:,}")
+        print(f"   Words (approx): {word_count:,}")
+        print(f"   Target was: ~2500 words")
+        if word_count < 2000:
+            print(f"   ⚠️  WARNING: Narrative is significantly shorter than target!")
+        print(f"   First 200 chars: {response_text[:200]}")
 
         return {"narrative_text": response.content}
 
@@ -258,8 +267,14 @@ def parse_output_node(state: StoryState) -> dict[str, Any]:
         story_bible_update = data.get("story_bible_update", {})
         beat_progress_score = data.get("beat_progress", state.get("beat_progress_score", 0.0))
 
+        # Calculate narrative statistics
+        narrative_words = len(narrative.split()) if narrative else 0
+        narrative_chars = len(narrative) if narrative else 0
+
         print(f"\n📊 Extracted from JSON:")
-        print(f"  Narrative length: {len(narrative)} chars")
+        print(f"  Narrative length: {narrative_chars:,} chars, {narrative_words:,} words")
+        if narrative_words < 2000:
+            print(f"  ⚠️  WARNING: Narrative has only {narrative_words} words (target: ~2500)")
         print(f"  Choices count: {len(choices) if isinstance(choices, list) else 'NOT A LIST'}")
         print(f"  Choices type: {type(choices).__name__}")
         if isinstance(choices, list):
@@ -652,8 +667,16 @@ async def generate_audio_node(state: StoryState) -> dict[str, Any]:
 
     # Clean and prepare text for narration
     narrative_text = state["narrative_text"].strip()
-    if len(narrative_text) > 5000:  # ElevenLabs has character limits
-        narrative_text = narrative_text[:5000] + "..."
+
+    # ElevenLabs supports up to 100K characters on paid plans
+    # For 2500-word chapters (~15,000 chars), we'll set a limit of 20,000 to be safe
+    MAX_AUDIO_CHARS = 20000
+
+    if len(narrative_text) > MAX_AUDIO_CHARS:
+        print(f"⚠️  Narrative is {len(narrative_text)} chars, truncating to {MAX_AUDIO_CHARS} for audio")
+        narrative_text = narrative_text[:MAX_AUDIO_CHARS] + "..."
+    else:
+        print(f"✓ Narrative is {len(narrative_text)} chars, within audio limit")
     
     max_retries = 3
     retry_delay = 2  # seconds
