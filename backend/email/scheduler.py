@@ -82,8 +82,12 @@ class EmailScheduler:
         )
 
         try:
+            # Use Resend's testing domain (works without verification)
+            # For production, verify your domain and change to: story@yourdomain.com
+            from_address = os.getenv("EMAIL_FROM_ADDRESS", "onboarding@resend.dev")
+
             params = {
-                "from": "StoryKeeper <story@storykeeper.app>",
+                "from": from_address,
                 "to": [user_email],
                 "subject": f"Chapter {chapter_number} is ready! 🎧",
                 "html": html,
@@ -143,8 +147,10 @@ class EmailScheduler:
         '''
 
         try:
+            from_address = os.getenv("EMAIL_FROM_ADDRESS", "onboarding@resend.dev")
+
             params = {
-                "from": "StoryKeeper <story@storykeeper.app>",
+                "from": from_address,
                 "to": [user_email],
                 "subject": "Welcome to StoryKeeper! Your story begins tomorrow.",
                 "html": html,
