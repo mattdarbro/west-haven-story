@@ -37,7 +37,7 @@ export function GenerationLog({
       setLogs(prev => [...prev, { timestamp, stage, message, level }]);
     };
 
-    const timers: NodeJS.Timeout[] = [];
+    const timers: number[] = [];
 
     // Initial logs (based on actual backend flow)
     addLog('START', `📚 Starting Chapter ${chapterNumber} generation...`, 'info');
