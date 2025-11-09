@@ -27,8 +27,8 @@ async def ensure_target_length(
     llm: ChatAnthropic,
     narrative_json: str,
     target_words: int = 2500,
-    tolerance: int = 200,
-    max_attempts: int = 2
+    tolerance: int = 300,
+    max_attempts: int = 1
 ) -> str:
     """
     Ensure generated narrative meets target word count through iterative refinement.
@@ -43,12 +43,14 @@ async def ensure_target_length(
         llm: ChatAnthropic instance
         narrative_json: JSON string with narrative field
         target_words: Target word count (default 2500)
-        tolerance: Acceptable deviation (default ±200 words)
-        max_attempts: Maximum refinement iterations (default 2)
+        tolerance: Acceptable deviation (default ±300 words)
+        max_attempts: Maximum refinement iterations (default 1)
 
     Returns:
         Refined JSON with narrative at target length
     """
+    import time
+    refinement_start = time.time()
     current_json = narrative_json
 
     for attempt in range(max_attempts):
@@ -103,7 +105,10 @@ Current JSON:
 
 Return the COMPLETE JSON with the expanded narrative (target {target_words} words):"""
 
+                refinement_call_start = time.time()
                 response = await llm.ainvoke([HumanMessage(content=expansion_prompt)])
+                refinement_call_duration = time.time() - refinement_call_start
+                print(f"   ⏱️  Expansion LLM call took {refinement_call_duration:.2f}s")
                 current_json = response.content.strip()
 
                 # Clean markdown if present
@@ -138,7 +143,10 @@ Current JSON:
 
 Return the COMPLETE JSON with the trimmed narrative (target {target_words} words):"""
 
+                refinement_call_start = time.time()
                 response = await llm.ainvoke([HumanMessage(content=trimming_prompt)])
+                refinement_call_duration = time.time() - refinement_call_start
+                print(f"   ⏱️  Trimming LLM call took {refinement_call_duration:.2f}s")
                 current_json = response.content.strip()
 
                 # Clean markdown if present
@@ -160,7 +168,9 @@ Return the COMPLETE JSON with the trimmed narrative (target {target_words} words
     final_narrative = final_data.get("narrative", "")
     final_clean = re.sub(r'^---\s*BEAT\s+\d+:.*?---\s*$', '', final_narrative, flags=re.MULTILINE).strip()
     final_word_count = len(final_clean.split())
+    refinement_duration = time.time() - refinement_start
     print(f"\n📋 Final length after {max_attempts} refinement attempts: {final_word_count} words")
+    print(f"⏱️  Refinement duration: {refinement_duration:.2f}s")
 
     return current_json
 
@@ -177,13 +187,17 @@ async def generate_narrative_node(state: StoryState) -> dict[str, Any]:
     Returns:
         Updated state with narrative_text populated (raw JSON from LLM)
     """
+    import time
+    start_time = time.time()
+
     try:
-        # Initialize LLM
+        # Initialize LLM with timeout to prevent indefinite hangs
         llm = ChatAnthropic(
             model=config.MODEL_NAME,
             temperature=config.TEMPERATURE,
             max_tokens=config.MAX_TOKENS,
             anthropic_api_key=config.ANTHROPIC_API_KEY,
+            timeout=120.0,  # 2 minute timeout for LLM calls
         )
 
         # Load world template
@@ -243,7 +257,9 @@ async def generate_narrative_node(state: StoryState) -> dict[str, Any]:
             print(f"✓ Generating continuation for beat {state['current_beat']}, turn {state.get('turns_in_beat', 0) + 1}")
 
         # Generate narrative
+        llm_start = time.time()
         response = await llm.ainvoke(messages)
+        llm_duration = time.time() - llm_start
 
         # Debug: print initial response statistics
         response_text = response.content
@@ -253,6 +269,7 @@ async def generate_narrative_node(state: StoryState) -> dict[str, Any]:
         print(f"   Characters: {char_count:,}")
         print(f"   Words (approx): {word_count:,}")
         print(f"   Target: ~2500 words")
+        print(f"   LLM call duration: {llm_duration:.2f}s")
         if word_count < 2000:
             print(f"   ⚠️  WARNING: Narrative is significantly shorter than target!")
         print(f"   First 200 chars: {response_text[:200]}")
@@ -263,9 +280,12 @@ async def generate_narrative_node(state: StoryState) -> dict[str, Any]:
             llm=llm,
             narrative_json=response.content,
             target_words=2500,
-            tolerance=200,  # Accept 2300-2700 words
-            max_attempts=2  # Up to 2 refinement iterations
+            tolerance=300,  # Accept 2200-2800 words (wider tolerance to reduce refinement calls)
+            max_attempts=1  # Single refinement attempt to prevent timeouts
         )
+
+        elapsed_time = time.time() - start_time
+        print(f"\n⏱️  Total narrative generation time: {elapsed_time:.2f} seconds")
 
         return {"narrative_text": refined_text}
 
@@ -652,6 +672,7 @@ Respond with ONLY the summary, no additional text or explanation."""
             temperature=0.3,  # Lower temperature for more focused summaries
             max_tokens=150,   # Keep summaries concise
             anthropic_api_key=config.ANTHROPIC_API_KEY,
+            timeout=30.0,  # 30 second timeout for quick summary generation
         )
 
         response = await llm.ainvoke([HumanMessage(content=summary_prompt)])
