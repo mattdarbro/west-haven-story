@@ -546,6 +546,14 @@ def parse_output_node(state: StoryState) -> dict[str, Any]:
         # Trim leading/trailing whitespace
         narrative = narrative.strip()
 
+        # Unescape any escaped newlines that might have been added during JSON error recovery
+        # This prevents literal '\n' strings from appearing in the narrative
+        if '\\n' in narrative:
+            print(f"⚠️  Found escaped newlines in narrative, unescaping...")
+            narrative = narrative.replace('\\n', '\n')
+            narrative = narrative.replace('\\r', '\r')
+            narrative = narrative.replace('\\t', '\t')
+
         sanitized_length = len(narrative)
         if sanitized_length < original_length:
             print(f"✓ Sanitized beat markers: {original_length} → {sanitized_length} chars ({original_length - sanitized_length} removed)")
