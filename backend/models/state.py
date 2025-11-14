@@ -56,6 +56,15 @@ class StoryState(TypedDict):
     generate_image: Annotated[bool | None, "Override image generation (None = use config)"]
     voice_id: Annotated[str | None, "ElevenLabs voice ID override (None = use config default)"]
 
+    # ===== RAG & Multi-Agent System =====
+    story_structure: Annotated[dict | None, "SSBA-generated story arc (Save the Cat beats)"]
+    current_story_beat: Annotated[str | None, "Current story beat name (e.g., 'fun_and_games')"]
+    chapter_beat_plan: Annotated[dict | None, "CBA-generated chapter beat plan"]
+    consistency_report: Annotated[dict | None, "CEA consistency check results"]
+    rag_chunks_indexed: Annotated[int, "Total paragraph chunks in vector store"]
+    last_rag_update: Annotated[str | None, "Timestamp of last RAG indexing"]
+    inconsistency_flags: Annotated[list[dict], "Active flags for irreconcilable contradictions (CEA → SSBA)"]
+
     # ===== User Management =====
     user_id: Annotated[str, "Session identifier (UUID)"]
     credits_remaining: Annotated[int, "Available story credits"]
@@ -249,6 +258,14 @@ def create_initial_state(
         generate_audio=generate_audio,
         generate_image=generate_image,
         voice_id=voice_id,
+        # RAG & Multi-Agent System
+        story_structure=None,
+        current_story_beat=None,
+        chapter_beat_plan=None,
+        consistency_report=None,
+        rag_chunks_indexed=0,
+        last_rag_update=None,
+        inconsistency_flags=[],
         user_id=user_id,
         credits_remaining=credits,
         world_id=world_id,

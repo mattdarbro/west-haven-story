@@ -76,7 +76,15 @@ This document describes the redesigned story generation system using a multi-age
   "character_arcs_status": {
     "protagonist": "Learning to trust others, 40% through arc",
     "love_interest": "Opening up about past, 35% through arc"
-  }
+  },
+  "inconsistency_resolutions": [
+    {
+      "flag_id": "charlie_mobility_ch15",
+      "resolution_plan": "Chapter 16 reveals experimental nerve regeneration treatment - turn contradiction into plot twist",
+      "integrated_into_beat": "midpoint",
+      "narrative_approach": "False victory - treatment seems to work but has hidden cost"
+    }
+  ]
 }
 ```
 
@@ -219,7 +227,17 @@ This document describes the redesigned story generation system using a multi-age
   ],
   "rag_queries_performed": 15,
   "contradictions_found": 3,
-  "auto_corrections_made": 3
+  "auto_corrections_made": 3,
+  "inconsistency_flags": [
+    {
+      "flag_id": "charlie_mobility_ch15",
+      "severity": "high",
+      "description": "Player choice implied Charlie walked independently, but Chapter 3 established wheelchair dependency",
+      "rag_evidence": "Chapter 3, paragraph 12: 'The explosion left Charlie dependent on his wheelchair'",
+      "suggested_resolution": "Reveal experimental treatment or retcon injury severity",
+      "flag_for_ssba": true
+    }
+  ]
 }
 ```
 
@@ -308,6 +326,9 @@ class StoryState(TypedDict):
     # RAG metadata
     rag_chunks_indexed: int  # Total paragraph chunks in vector store
     last_rag_update: str  # Timestamp of last vector store update
+
+    # Inconsistency tracking (CEA → SSBA communication)
+    inconsistency_flags: list[dict]  # Active flags for irreconcilable contradictions
 ```
 
 ### Vector Store Schema
@@ -651,7 +672,7 @@ Since there are no active users yet, we can:
 
 ## Decisions Made
 
-### ✅ RESOLVED
+### ✅ ALL RESOLVED
 
 1. **CEA Authority:** Auto-fix contradictions without manual intervention (scalability required)
 
@@ -661,28 +682,22 @@ Since there are no active users yet, we can:
 
 4. **CEA Context Minimum:** Skip Chapter 1 only (start CEA from Chapter 2)
 
----
+5. **Irreconcilable Contradictions → Story Features!** 🎭
+   - When CEA finds contradictions it can't auto-fix, **flag them as plot opportunities**
+   - CEA shares flags with SSBA via `inconsistency_flags` field
+   - SSBA weaves contradictions into story beats as intentional twists/reveals
+   - Example: "Charlie walked in Chapter 15 despite wheelchair" → becomes "Chapter 16 reveals experimental nerve regeneration treatment"
+   - **Contradictions become features, not bugs!**
 
-## Open Questions (Still Need Decisions)
+6. **SSBA Structure Updates:** YES - SSBA can update story structure mid-story
+   - Especially when resolving inconsistency flags
+   - Allows dynamic adaptation to player choices
+   - Maintains overall arc while being flexible
 
-1. **How to handle irreconcilable contradictions from user choices?**
-   - Example: User chose "Charlie walks away" but he's in wheelchair
-   - **Option A:** Maintain consistency, modify choice interpretation gracefully in prose
-   - **Option B:** Respect choice literally, retcon story bible (risky)
-   - **Option C:** Generate choices that CAN'T contradict (CEA validates before presenting)
-   - **Recommendation:** Option C - CEA should only generate choices that are consistent
-
-2. **Should SSBA be allowed to modify story structure mid-story?**
-   - **Rigid:** Lock story structure after Chapter 1 (predictable)
-   - **Flexible:** Allow SSBA to adapt based on player choices (dynamic)
-   - **Hybrid:** Allow minor adjustments, lock major beats (balanced)
-   - **Recommendation:** Start rigid, evaluate after testing
-
-3. **How to surface consistency checks to users?**
-   - **Hidden:** Fix silently, maintain immersion (current plan)
-   - **Transparent:** Show "consistency maintained" badge
-   - **Educational:** Show what was caught and fixed (breaks immersion)
-   - **Recommendation:** Hidden by default, optional debug mode for development
+7. **User Visibility:** ZERO - All backend operations completely hidden
+   - No consistency badges, no debug info shown to users
+   - Users experience seamless story, unaware of agent orchestration
+   - Backend magic stays invisible
 
 ---
 
