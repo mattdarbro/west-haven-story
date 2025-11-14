@@ -1152,7 +1152,192 @@ def add_user_message_node(state: StoryState, user_input: str) -> dict[str, Any]:
     return {"messages": messages}
 
 
-# ===== Node 8: Extract Entities from Narrative =====
+# ===== Node 8: Story Structure Beat Agent (SSBA) =====
+
+async def story_structure_beat_node(state: StoryState) -> dict[str, Any]:
+    """
+    Generate full story structure for 30-chapter arc (Chapter 1 only).
+
+    Uses "Save the Cat" beat structure to create story-level planning.
+
+    Args:
+        state: Current story state
+
+    Returns:
+        Updated state with story_structure populated
+    """
+    import time
+    import json
+    from langchain_core.messages import HumanMessage
+    from langchain_anthropic import ChatAnthropic
+
+    start_time = time.time()
+
+    try:
+        print(f"\n{'='*70}")
+        print(f"SSBA: CREATING STORY STRUCTURE")
+        print(f"{'='*70}")
+
+        # Initialize LLM
+        llm = ChatAnthropic(
+            model=config.MODEL_NAME,
+            temperature=0.7,  # Slightly creative for planning
+            max_tokens=8000,  # Need space for full structure
+            anthropic_api_key=config.ANTHROPIC_API_KEY,
+            timeout=30.0,
+        )
+
+        # Load world template
+        from backend.storyteller.prompts_v2 import load_world_template, create_story_structure_prompt
+
+        world_template = load_world_template(state["world_id"])
+        total_chapters = state.get("total_chapters", 30)
+
+        # Create prompt
+        prompt = create_story_structure_prompt(world_template, total_chapters)
+
+        # Generate story structure
+        llm_start = time.time()
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        llm_duration = time.time() - llm_start
+
+        print(f"✓ SSBA response received ({llm_duration:.2f}s)")
+
+        # Parse JSON response
+        response_text = response.content.strip()
+
+        # Clean markdown if present
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+
+        try:
+            story_structure = json.loads(response_text)
+            print(f"✓ Story structure parsed successfully")
+            print(f"  Acts defined: {len(story_structure.get('story_structure', {}))}")
+            print(f"  Character arcs: {len(story_structure.get('key_arcs', {}))}")
+
+            elapsed = time.time() - start_time
+            print(f"⏱️  SSBA total time: {elapsed:.2f}s")
+
+            return {"story_structure": story_structure}
+
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse story structure JSON: {e}")
+            print(f"Response preview: {response_text[:500]}")
+            # Return empty structure rather than failing
+            return {"story_structure": {"error": "Failed to parse structure"}}
+
+    except Exception as e:
+        print(f"Error in story_structure_beat_node: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"story_structure": {"error": str(e)}}
+
+
+async def story_beat_checkin_node(state: StoryState) -> dict[str, Any]:
+    """
+    SSBA check-in for chapters 2-30 (lightweight guidance).
+
+    Provides story position context based on established structure.
+
+    Args:
+        state: Current story state with story_structure
+
+    Returns:
+        Updated state with current_story_beat and guidance
+    """
+    import time
+    import json
+    from langchain_core.messages import HumanMessage
+    from langchain_anthropic import ChatAnthropic
+
+    start_time = time.time()
+
+    try:
+        chapter_number = state.get("chapter_number", 1)
+
+        print(f"\n{'='*70}")
+        print(f"SSBA: CHECK-IN FOR CHAPTER {chapter_number}")
+        print(f"{'='*70}")
+
+        # Initialize LLM
+        llm = ChatAnthropic(
+            model=config.MODEL_NAME,
+            temperature=0.3,  # Lower temperature for consistent guidance
+            max_tokens=1000,  # Lightweight response
+            anthropic_api_key=config.ANTHROPIC_API_KEY,
+            timeout=15.0,
+        )
+
+        # Get story context
+        from backend.storyteller.prompts_v2 import create_story_beat_checkin_prompt
+
+        story_structure = state.get("story_structure", {})
+        total_chapters = state.get("total_chapters", 30)
+        story_bible = state.get("generated_story_bible", {})
+        summaries = state.get("story_summary", [])
+        inconsistency_flags = state.get("inconsistency_flags", [])
+
+        # Create prompt
+        prompt = create_story_beat_checkin_prompt(
+            story_structure=story_structure,
+            chapter_number=chapter_number,
+            total_chapters=total_chapters,
+            story_bible=story_bible,
+            summaries=summaries,
+            inconsistency_flags=inconsistency_flags
+        )
+
+        # Get guidance
+        llm_start = time.time()
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        llm_duration = time.time() - llm_start
+
+        print(f"✓ SSBA check-in received ({llm_duration:.2f}s)")
+
+        # Parse JSON response
+        response_text = response.content.strip()
+
+        # Clean markdown if present
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+
+        try:
+            guidance = json.loads(response_text)
+            print(f"✓ Guidance parsed successfully")
+            print(f"  Current beat: {guidance.get('current_story_beat', 'unknown')}")
+            print(f"  Act: {guidance.get('act', '?')}")
+            print(f"  Progress: {guidance.get('progress_percentage', 0):.1f}%")
+            print(f"  Guidance: {guidance.get('guidance_for_cba', 'N/A')[:80]}...")
+
+            elapsed = time.time() - start_time
+            print(f"⏱️  SSBA check-in time: {elapsed:.2f}s")
+
+            return {
+                "current_story_beat": guidance.get("current_story_beat"),
+                "_ssba_guidance": guidance  # Temporary field for CBA to use
+            }
+
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse check-in JSON: {e}")
+            # Return minimal guidance
+            return {
+                "current_story_beat": "unknown",
+                "_ssba_guidance": {"error": "Failed to parse"}
+            }
+
+    except Exception as e:
+        print(f"Error in story_beat_checkin_node: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"current_story_beat": "unknown"}
+
+
+# ===== Node 10: Extract Entities from Narrative =====
 
 async def extract_entities_node(state: StoryState) -> dict[str, Any]:
     """

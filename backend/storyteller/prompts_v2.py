@@ -485,3 +485,288 @@ def format_conversation_history(messages: list) -> str:
         formatted.append(f"{role}: {content}")
 
     return "\n".join(formatted)
+
+
+# ===== SSBA (Story Structure Beat Agent) Prompts =====
+
+def create_story_structure_prompt(
+    world_template: dict,
+    total_chapters: int = 30
+) -> str:
+    """
+    Create prompt for SSBA to generate full story arc (Chapter 1 only).
+
+    Uses "Save the Cat" beat structure adapted for 30-chapter serial story.
+
+    Args:
+        world_template: Loaded world template
+        total_chapters: Total chapters in story (default 30)
+
+    Returns:
+        Prompt string for story structure generation
+    """
+    world_lore = world_template.get("world_lore", {})
+    character_arc = world_template.get("character_arc_template", {})
+    genre = world_template.get("genre", "science fiction")
+
+    protagonist_arc = character_arc.get("protagonist", {}).get("arc", "")
+    themes = world_template.get("themes", [])
+
+    prompt = f"""You are a Story Structure Beat Agent (SSBA) creating a {total_chapters}-chapter story arc.
+
+WORLD & GENRE:
+- Setting: {world_lore.get('setting', 'sci-fi space station')}
+- Genre: {genre}
+- Themes: {', '.join(themes) if themes else 'exploration, mystery, relationships'}
+
+PROTAGONIST ARC:
+{protagonist_arc}
+
+YOUR TASK:
+Create a complete {total_chapters}-chapter story structure using the "Save the Cat" beat system adapted for serial storytelling.
+
+MAP THESE BEATS TO CHAPTERS:
+
+ACT 1 (Setup) - Chapters 1-{int(total_chapters * 0.25)}:
+1. OPENING IMAGE (Chapter 1)
+   - Before snapshot - establish ordinary world
+   - Introduce protagonist's flaw or need
+
+2. THEME STATED (Chapters 1-2)
+   - Hint at the deeper meaning/lesson
+   - Can be subtle or in dialogue
+
+3. SETUP (Chapters 1-{int(total_chapters * 0.15)})
+   - Establish characters, relationships, world rules
+   - Show protagonist's status quo and what they want
+
+4. CATALYST (Chapters {int(total_chapters * 0.10)}-{int(total_chapters * 0.12)})
+   - Life-changing event happens
+   - Point of no return approaches
+
+5. DEBATE (Chapters {int(total_chapters * 0.12)}-{int(total_chapters * 0.25)})
+   - Should they take the journey?
+   - Fear, doubt, resistance
+
+ACT 2A (Fun & Games) - Chapters {int(total_chapters * 0.25)}-{int(total_chapters * 0.5)}:
+6. BREAK INTO 2 (Chapter {int(total_chapters * 0.25)})
+   - Decision made, new world entered
+   - "Point of no return"
+
+7. B STORY (Chapters {int(total_chapters * 0.25)}-{int(total_chapters * 0.35)})
+   - Love interest or mentor relationship develops
+   - Represents thematic heart
+
+8. FUN AND GAMES (Chapters {int(total_chapters * 0.25)}-{int(total_chapters * 0.5)})
+   - Promise of the premise delivered
+   - Exploration, discovery, new experiences
+   - Build toward midpoint
+
+9. MIDPOINT (Chapters {int(total_chapters * 0.48)}-{int(total_chapters * 0.52)})
+   - False victory OR false defeat
+   - Stakes raised, ticking clock starts
+   - Protagonist takes control (or loses it)
+
+ACT 2B (Bad Guys Close In) - Chapters {int(total_chapters * 0.52)}-{int(total_chapters * 0.75)}:
+10. BAD GUYS CLOSE IN (Chapters {int(total_chapters * 0.52)}-{int(total_chapters * 0.70)})
+    - External pressure increases
+    - Internal doubts grow
+    - Team falling apart OR enemies strengthening
+
+11. ALL IS LOST (Chapters {int(total_chapters * 0.70)}-{int(total_chapters * 0.73)})
+    - Lowest point
+    - False defeat (if midpoint was false victory)
+    - Whiff of death (literal or metaphorical)
+
+12. DARK NIGHT OF SOUL (Chapter {int(total_chapters * 0.75)})
+    - Reflection and despair
+    - Questioning everything
+    - Seeming to give up
+
+ACT 3 (Resolution) - Chapters {int(total_chapters * 0.75)}-{total_chapters}:
+13. BREAK INTO 3 (Chapter {int(total_chapters * 0.80)})
+    - Inspiration strikes
+    - New plan formed
+    - Protagonist synthesizes lessons
+
+14. FINALE (Chapters {int(total_chapters * 0.80)}-{int(total_chapters * 0.95)})
+    - Execute the plan
+    - Confront antagonist/challenge
+    - All storylines converge
+    - Character proves growth
+
+15. FINAL IMAGE (Chapter {total_chapters})
+    - After snapshot
+    - Mirror of opening image
+    - Show how character/world has changed
+
+RETURN JSON FORMAT:
+{{
+  "story_structure": {{
+    "act_1": {{
+      "opening_image": {{
+        "chapters": [1],
+        "description": "Brief description of what happens",
+        "character_state": "Protagonist's starting point"
+      }},
+      "theme_stated": {{ "chapters": [1, 2], "description": "...", "thematic_question": "..." }},
+      "setup": {{ "chapters": [1-5], "description": "...", "key_relationships": ["..."] }},
+      "catalyst": {{ "chapters": [3-4], "description": "...", "inciting_incident": "..." }},
+      "debate": {{ "chapters": [4-8], "description": "...", "internal_conflict": "..." }}
+    }},
+    "act_2a": {{
+      "break_into_2": {{ "chapters": [8], "description": "...", "point_of_no_return": "..." }},
+      "b_story": {{ "chapters": [8-11], "description": "...", "relationship_focus": "..." }},
+      "fun_and_games": {{ "chapters": [8-15], "description": "...", "premise_promise": "..." }},
+      "midpoint": {{ "chapters": [14-16], "description": "...", "false_victory_or_defeat": "victory", "stakes_raised": "..." }}
+    }},
+    "act_2b": {{
+      "bad_guys_close_in": {{ "chapters": [16-21], "description": "...", "pressure_sources": ["..."] }},
+      "all_is_lost": {{ "chapters": [21-22], "description": "...", "loss_description": "..." }},
+      "dark_night_of_soul": {{ "chapters": [23], "description": "...", "character_low_point": "..." }}
+    }},
+    "act_3": {{
+      "break_into_3": {{ "chapters": [24], "description": "...", "revelation": "..." }},
+      "finale": {{ "chapters": [24-29], "description": "...", "climax_description": "...", "resolution_plan": "..." }},
+      "final_image": {{ "chapters": [30], "description": "...", "transformation_shown": "..." }}
+    }}
+  }},
+  "key_arcs": {{
+    "protagonist_arc": "From [starting state] to [ending state]",
+    "love_interest_arc": "...",
+    "antagonist_arc": "...",
+    "thematic_arc": "..."
+  }},
+  "major_plot_points": [
+    {{ "chapter": 3, "event": "...", "impact": "..." }},
+    {{ "chapter": 15, "event": "...", "impact": "..." }},
+    {{ "chapter": 23, "event": "...", "impact": "..." }}
+  ]
+}}
+
+IMPORTANT:
+- Be specific about what happens in each beat
+- Consider {total_chapters} chapters - pace accordingly
+- Leave room for player choices to influence details
+- Character arcs should align with beat structure
+- Balance action, relationship, and theme throughout
+"""
+
+    return prompt
+
+
+def create_story_beat_checkin_prompt(
+    story_structure: dict,
+    chapter_number: int,
+    total_chapters: int,
+    story_bible: dict,
+    summaries: list,
+    inconsistency_flags: list
+) -> str:
+    """
+    Create prompt for SSBA check-in (Chapters 2-30).
+
+    Provides lightweight guidance based on story structure position.
+
+    Args:
+        story_structure: Full story structure from Chapter 1
+        chapter_number: Current chapter number
+        total_chapters: Total chapters
+        story_bible: Current story bible
+        summaries: Recent chapter summaries
+        inconsistency_flags: Active inconsistency flags from CEA
+
+    Returns:
+        Prompt string for check-in
+    """
+    progress_pct = (chapter_number / total_chapters) * 100
+
+    # Determine current act and beat
+    if progress_pct < 25:
+        act = "1"
+        phase = "Setup"
+    elif progress_pct < 50:
+        act = "2a"
+        phase = "Fun & Games"
+    elif progress_pct < 75:
+        act = "2b"
+        phase = "Bad Guys Close In"
+    else:
+        act = "3"
+        phase = "Resolution"
+
+    # Find current beat from structure
+    current_beat_name = "unknown"
+    current_beat_description = ""
+    upcoming_milestone = ""
+
+    # Search through story structure to find current beat
+    for act_name, act_data in story_structure.items():
+        if isinstance(act_data, dict):
+            for beat_name, beat_data in act_data.items():
+                if isinstance(beat_data, dict) and "chapters" in beat_data:
+                    chapters = beat_data["chapters"]
+                    # Check if current chapter is in this beat's range
+                    if isinstance(chapters, list) and len(chapters) > 0:
+                        if isinstance(chapters[0], int):
+                            if chapter_number in chapters or chapter_number == chapters[0]:
+                                current_beat_name = beat_name
+                                current_beat_description = beat_data.get("description", "")
+
+    # Recent summaries for context
+    recent_summary = "\n".join(summaries[-3:]) if summaries else "Story just beginning"
+
+    # Format inconsistency flags
+    flags_text = ""
+    if inconsistency_flags:
+        flags_text = "\n\nINCONSISTENCY FLAGS TO ADDRESS:\n"
+        for flag in inconsistency_flags:
+            flags_text += f"- {flag.get('description', 'Unknown')} (Suggested: {flag.get('suggested_resolution', 'TBD')})\n"
+
+    prompt = f"""You are checking in on Chapter {chapter_number} of {total_chapters}.
+
+STORY POSITION:
+- Progress: {progress_pct:.1f}% complete
+- Current Act: Act {act} ({phase})
+- Current Beat: {current_beat_name}
+- Description: {current_beat_description}
+
+RECENT EVENTS:
+{recent_summary}
+
+PROTAGONIST STATUS:
+{story_bible.get('protagonist', {}).get('current_state', 'Developing')}
+
+YOUR TASK:
+Provide guidance for Chapter {chapter_number} based on story structure position.{flags_text}
+
+RETURN JSON FORMAT:
+{{
+  "current_story_beat": "{current_beat_name}",
+  "act": "{act}",
+  "progress_percentage": {progress_pct:.1f},
+  "guidance_for_cba": "1-2 sentence guidance on what this chapter should accomplish",
+  "upcoming_milestone": "What major beat or event is coming up soon",
+  "character_arcs_status": {{
+    "protagonist": "Brief status of protagonist's arc progression",
+    "love_interest": "Brief status if relevant"
+  }},
+  "inconsistency_resolutions": [
+    {{
+      "flag_id": "id_from_flag_if_any",
+      "resolution_plan": "How to weave contradiction into plot",
+      "integrated_into_beat": "current_beat_name",
+      "narrative_approach": "Brief approach description"
+    }}
+  ]
+}}
+
+GUIDANCE PRINCIPLES:
+- Be specific but allow flexibility for player choices
+- Reference story structure to maintain pacing
+- Suggest how to advance character arcs
+- Note if approaching major plot point
+- If inconsistency flags exist, suggest creative resolutions
+"""
+
+    return prompt
