@@ -42,6 +42,22 @@ except Exception as e:
     email_choice_router = None
     routes_loaded = False
 
+# Import FictionMail dev routes
+try:
+    from backend.routes.fictionmail_dev import (
+        dev_onboarding,
+        dev_generate_story,
+        dev_rate_story,
+        dev_get_bible,
+        dev_reset
+    )
+    fictionmail_loaded = True
+except Exception as e:
+    print(f"⚠️  FictionMail dev routes loading failed: {e}")
+    import traceback
+    traceback.print_exc()
+    fictionmail_loaded = False
+
 # Create FastAPI app
 app = FastAPI(
     title="Storyteller API",
@@ -66,6 +82,17 @@ if routes_loaded and router:
     app.include_router(email_choice_router, prefix="/api")  # Email choice handler
 else:
     print("⚠️  Skipping routes registration due to initialization failure")
+
+# Include FictionMail dev routes
+if fictionmail_loaded:
+    app.add_api_route("/api/dev/onboarding", dev_onboarding, methods=["POST"])
+    app.add_api_route("/api/dev/generate-story", dev_generate_story, methods=["POST"])
+    app.add_api_route("/api/dev/rate-story", dev_rate_story, methods=["POST"])
+    app.add_api_route("/api/dev/bible", dev_get_bible, methods=["GET"])
+    app.add_api_route("/api/dev/reset", dev_reset, methods=["DELETE"])
+    print("✓ FictionMail dev routes loaded")
+else:
+    print("⚠️  Skipping FictionMail dev routes")
 
 # Mount static files for generated media
 # Create directories if they don't exist
