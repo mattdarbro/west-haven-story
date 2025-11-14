@@ -770,3 +770,492 @@ GUIDANCE PRINCIPLES:
 """
 
     return prompt
+
+
+def create_chapter_beat_prompt(
+    world_template: dict,
+    chapter_number: int,
+    total_chapters: int,
+    story_structure: dict = None,
+    ssba_guidance: dict = None,
+    story_bible: dict = None,
+    last_choice: str = None,
+    summaries: list = None
+) -> str:
+    """
+    Create prompt for CBA (Chapter Beat Agent) to generate 6-beat chapter structure.
+
+    This prompt helps CBA plan the internal structure of a single chapter using
+    a 6-beat mini-arc that fits within the larger story beats from SSBA.
+
+    Args:
+        world_template: World template with genre, characters, setting
+        chapter_number: Current chapter number (1-30)
+        total_chapters: Total chapters in story (typically 30)
+        story_structure: Full story structure from SSBA (Save the Cat beats)
+        ssba_guidance: SSBA's guidance for this chapter from check-in
+        story_bible: Current story bible with characters, events, locations
+        last_choice: The player's choice that led to this chapter
+        summaries: Recent chapter summaries for context
+
+    Returns:
+        str: Formatted prompt for CBA
+    """
+    world_name = world_template.get("name", "Unknown World")
+    genre = world_template.get("genre", "science fiction")
+    setting = world_template.get("world_lore", {}).get("setting", "")
+    protagonist = world_template.get("characters", {}).get("protagonist", {})
+
+    # Calculate progress
+    progress = (chapter_number / total_chapters) * 100
+
+    # Determine current story beat from SSBA guidance
+    current_story_beat = "N/A"
+    if ssba_guidance and "current_story_beat" in ssba_guidance:
+        current_story_beat = ssba_guidance["current_story_beat"]
+
+    # Build context sections
+    story_structure_context = ""
+    if story_structure:
+        story_structure_context = f"\n\n## STORY STRUCTURE (from SSBA)\n{json.dumps(story_structure, indent=2)}"
+
+    ssba_guidance_context = ""
+    if ssba_guidance:
+        ssba_guidance_context = f"\n\n## SSBA GUIDANCE FOR THIS CHAPTER\n{json.dumps(ssba_guidance, indent=2)}"
+
+    story_bible_context = ""
+    if story_bible:
+        story_bible_context = f"\n\n## STORY BIBLE (Current State)\n{json.dumps(story_bible, indent=2)}"
+
+    last_choice_context = ""
+    if last_choice:
+        last_choice_context = f"\n\n## PLAYER'S LAST CHOICE\n{last_choice}"
+
+    summaries_context = ""
+    if summaries and len(summaries) > 0:
+        recent_summaries = summaries[-3:] if len(summaries) > 3 else summaries
+        summaries_text = "\n".join([f"- {s}" for s in recent_summaries])
+        summaries_context = f"\n\n## RECENT CHAPTER SUMMARIES\n{summaries_text}"
+
+    prompt = f"""You are the Chapter Beat Agent (CBA) for "{world_name}", a {genre} interactive story.
+
+## YOUR ROLE
+Plan the internal structure of Chapter {chapter_number} using a 6-beat mini-arc that:
+1. Fits within the larger story beat guidance from SSBA
+2. Creates a satisfying chapter-level experience (~2,400-2,700 words)
+3. Advances character arcs and plot while allowing for player choices
+4. Maintains pacing and tension appropriate to the story position
+
+## STORY CONTEXT
+- **Chapter**: {chapter_number} of {total_chapters} ({progress:.1f}% complete)
+- **Current Story Beat**: {current_story_beat}
+- **Setting**: {setting}
+- **Protagonist**: {protagonist.get('name', 'N/A')}{story_structure_context}{ssba_guidance_context}{story_bible_context}{last_choice_context}{summaries_context}
+
+## 6-BEAT CHAPTER STRUCTURE
+
+Plan 6 beats for this chapter, each targeting ~400-450 words:
+
+**Beat 1: OPENING HOOK** (0-450 words)
+- Immediate engagement: action, mystery, emotion, or tension
+- Ground reader in POV, setting, immediate situation
+- Connect to last chapter's ending/player's choice
+- Set chapter question: "What will happen with...?"
+
+**Beat 2: RISING ACTION** (450-900 words)
+- Develop the chapter's central situation or conflict
+- Introduce complications or new information
+- Character reactions, decisions, interactions
+- Build momentum toward midpoint
+
+**Beat 3: MIDPOINT TWIST** (900-1,350 words)
+- Surprise, revelation, or shift in understanding
+- Raise stakes or change direction
+- False victory OR setback that complicates situation
+- Chapter question becomes more urgent
+
+**Beat 4: COMPLICATIONS** (1,350-1,800 words)
+- Consequences of midpoint unfold
+- Obstacles intensify, pressure increases
+- Character struggles with challenge
+- Tension peaks as situation worsens or clarifies
+
+**Beat 5: DARK NIGHT / TENSION PEAK** (1,800-2,250 words)
+- Moment of maximum pressure or emotional intensity
+- Character must make difficult choice or face hard truth
+- All seems lost OR victory seems within grasp (depending on story beat)
+- Sets up resolution
+
+**Beat 6: RESOLUTION & HOOK** (2,250-2,700 words)
+- Resolve chapter's immediate question/conflict
+- Show consequences of character's actions/choices
+- Advance story bible (character state, relationships, world state)
+- **CRITICAL**: End with hook that sets up player choices
+- Hook should present clear decision point or dilemma
+
+## JSON FORMAT
+
+Return your chapter beat plan as JSON:
+
+```json
+{{
+  "chapter_beats": [
+    {{
+      "beat_number": 1,
+      "beat_name": "opening_hook",
+      "word_target": 450,
+      "description": "Brief description of what happens in this beat",
+      "key_elements": ["element1", "element2"],
+      "emotional_tone": "tense/hopeful/mysterious/etc",
+      "character_focus": "Who is POV or central to this beat"
+    }},
+    // ... beats 2-6 following same structure
+  ],
+  "chapter_goal": "What this chapter accomplishes in the larger story",
+  "chapter_tension": "What creates tension/interest throughout chapter",
+  "chapter_question": "The question that drives reader through chapter",
+  "setup_for_next": "What this chapter sets up for next chapter",
+  "choice_setup": {{
+    "situation": "The dilemma or decision point at chapter end",
+    "stakes": "Why this choice matters",
+    "suggested_choice_types": ["type1", "type2", "type3"]
+  }}
+}}
+```
+
+## BEAT PLANNING PRINCIPLES
+
+1. **Pacing**: Each beat should flow naturally into the next
+2. **Character Arc**: Show protagonist changing, learning, or struggling
+3. **World Building**: Integrate setting details organically
+4. **Player Agency**: Structure allows for meaningful choices to affect story
+5. **Story Alignment**: Serve the current story beat from SSBA
+6. **Micro-Tension**: Each beat should have its own small tension or question
+7. **Hook Quality**: Final beat must create genuine anticipation/dilemma
+
+## ALIGNMENT WITH SSBA GUIDANCE
+
+If SSBA provided specific guidance:
+- Follow suggested character arc moments
+- Hit any plot points mentioned
+- Maintain specified emotional tone
+- Advance relationships as indicated
+- Resolve any inconsistency flags creatively
+
+## TARGET METRICS
+
+- **Total Chapter Length**: ~2,400-2,700 words
+- **Beat Length**: ~400-450 words each
+- **Pacing**: Varied (fast action vs slow reflection based on story beat)
+- **Tension Curve**: Build → Peak at Beat 5 → Resolve + Hook at Beat 6
+
+Plan the 6 beats for Chapter {chapter_number} now, ensuring they create a compelling chapter experience while advancing the larger story.
+"""
+
+    return prompt
+
+
+def create_consistency_check_prompt(
+    chapter_number: int,
+    chapter_beat_plan: dict,
+    story_bible: dict,
+    consistency_report: dict,
+    last_choice: str = None
+) -> str:
+    """
+    Create prompt for CEA to analyze consistency and identify potential contradictions.
+
+    CEA reviews the RAG consistency report and determines:
+    1. Are there any contradictions that can be auto-fixed?
+    2. Are there irreconcilable contradictions that should become plot features?
+    3. What guidance should be provided to the Prose Agent?
+
+    Args:
+        chapter_number: Current chapter number
+        chapter_beat_plan: CBA's beat plan for this chapter
+        story_bible: Current story bible
+        consistency_report: RAG consistency check results
+        last_choice: Player's last choice
+
+    Returns:
+        str: Formatted prompt for CEA
+    """
+    chapter_goal = chapter_beat_plan.get("chapter_goal", "N/A")
+    relevant_history = consistency_report.get("relevant_history", [])
+    risk_level = consistency_report.get("overall_risk", "none")
+
+    # Format relevant history
+    history_text = ""
+    if relevant_history:
+        history_items = []
+        for item in relevant_history[:10]:  # Top 10
+            chapter = item.get("chapter", "?")
+            text = item.get("text", "")
+            history_items.append(f"  • Chapter {chapter}: {text}")
+        history_text = "\n".join(history_items)
+    else:
+        history_text = "  (No relevant history found)"
+
+    last_choice_context = ""
+    if last_choice:
+        last_choice_context = f"\n\n## PLAYER'S LAST CHOICE\n{last_choice}"
+
+    prompt = f"""You are the Context Editor Agent (CEA) for this interactive story.
+
+## YOUR ROLE
+
+Review the planned chapter content against established narrative history and:
+1. **Identify contradictions**: Does the plan conflict with established facts?
+2. **Auto-fix minor issues**: Suggest adjustments for small inconsistencies
+3. **Flag major contradictions**: Identify irreconcilable contradictions as plot opportunities
+4. **Provide guidance**: Give clear directions to the Prose Agent
+
+## CHAPTER CONTEXT
+
+**Chapter {chapter_number}**
+- **Goal**: {chapter_goal}
+- **Risk Level**: {risk_level}{last_choice_context}
+
+## PLANNED CHAPTER BEATS
+
+{json.dumps(chapter_beat_plan, indent=2)}
+
+## RELEVANT NARRATIVE HISTORY (from RAG)
+
+{history_text}
+
+## STORY BIBLE (Current State)
+
+{json.dumps(story_bible, indent=2)}
+
+## YOUR ANALYSIS TASK
+
+Review the chapter beat plan against the narrative history and story bible.
+
+For each beat in the plan, consider:
+1. Does this beat contradict any established character traits, abilities, or limitations?
+2. Does this beat contradict locations, timeline, or world rules?
+3. Does this beat contradict relationships or past events?
+
+**Minor Contradictions (Auto-Fix)**:
+- Small timeline inconsistencies
+- Character trait variations that can be explained
+- Location details that can be reconciled
+→ Suggest specific fixes in your guidance
+
+**Major Contradictions (Flag as Plot Features)**:
+- Character abilities suddenly changing without explanation
+- Timeline impossibilities
+- Character death/departure conflicts
+- Physical impossibilities given established rules
+→ Flag these for SSBA to weave into plot as reveals/twists
+
+## JSON FORMAT
+
+Return your analysis as JSON:
+
+```json
+{{
+  "consistency_status": "clear" | "minor_issues" | "major_contradiction",
+  "minor_issues": [
+    {{
+      "beat_number": 1,
+      "issue": "Brief description of inconsistency",
+      "auto_fix_suggestion": "How to adjust the beat to maintain consistency",
+      "context_from_history": "Relevant history that conflicts"
+    }}
+  ],
+  "major_contradictions": [
+    {{
+      "beat_number": 3,
+      "contradiction": "Description of irreconcilable contradiction",
+      "relevant_history": "Established facts that conflict",
+      "plot_opportunity": "How this could become an intentional plot reveal",
+      "flag_for_ssba": true
+    }}
+  ],
+  "guidance_for_prose_agent": {{
+    "general_guidance": "Overall guidance for prose generation",
+    "beat_specific_notes": {{
+      "1": "Note for beat 1",
+      "3": "Note for beat 3"
+    }},
+    "emphasis_points": ["What to emphasize", "What to be careful with"],
+    "avoid": ["What to avoid to prevent contradictions"]
+  }},
+  "inconsistency_flags": [
+    {{
+      "flag_id": "unique_flag_id_ch{chapter_number}_issue",
+      "description": "Description for SSBA",
+      "suggested_resolution": "How SSBA might weave this into story",
+      "severity": "low" | "medium" | "high"
+    }}
+  ]
+}}
+```
+
+## DECISION PRINCIPLES
+
+1. **Prefer Auto-Fix**: Try to adjust beats to maintain consistency when possible
+2. **Respect Player Agency**: Don't contradict player choices without narrative justification
+3. **Protect Established Canon**: Character limitations (disabilities, skills) are sacred
+4. **Embrace Plot Opportunities**: Major contradictions can become great story moments
+5. **Clear Guidance**: Give PA specific, actionable direction
+
+Analyze the chapter plan for consistency now, focusing on protecting established narrative canon while enabling creative storytelling.
+"""
+
+    return prompt
+
+
+def create_choice_generation_prompt(
+    world_template: dict,
+    chapter_number: int,
+    narrative: str,
+    story_bible: dict,
+    chapter_beat_plan: dict = None,
+    ssba_guidance: dict = None
+) -> str:
+    """
+    Create prompt for CEA to generate player choices.
+
+    CEA generates 3 meaningful choices based on:
+    - The chapter's ending situation
+    - Character arcs and story beats
+    - Player agency and story direction
+
+    Args:
+        world_template: World template
+        chapter_number: Current chapter number
+        narrative: The chapter narrative just generated
+        story_bible: Current story bible
+        chapter_beat_plan: CBA's beat plan (for context)
+        ssba_guidance: SSBA guidance (for story direction)
+
+    Returns:
+        str: Formatted prompt for CEA to generate choices
+    """
+    world_name = world_template.get("name", "Unknown World")
+    genre = world_template.get("genre", "science fiction")
+    protagonist = world_template.get("characters", {}).get("protagonist", {})
+
+    # Extract narrative ending (last ~500 chars)
+    narrative_ending = narrative[-500:] if len(narrative) > 500 else narrative
+
+    chapter_goal = ""
+    choice_setup = {}
+    if chapter_beat_plan:
+        chapter_goal = chapter_beat_plan.get("chapter_goal", "")
+        choice_setup = chapter_beat_plan.get("choice_setup", {})
+
+    current_beat = ""
+    if ssba_guidance:
+        current_beat = ssba_guidance.get("current_story_beat", "")
+
+    choice_setup_context = ""
+    if choice_setup:
+        choice_setup_context = f"\n\n## CHOICE SETUP FROM CBA\n{json.dumps(choice_setup, indent=2)}"
+
+    prompt = f"""You are the Context Editor Agent (CEA) generating player choices for "{world_name}", a {genre} interactive story.
+
+## YOUR ROLE
+
+Generate 3 meaningful player choices that:
+1. **Honor the Chapter Ending**: Choices emerge naturally from the narrative situation
+2. **Advance Character Arcs**: Choices should challenge/develop the protagonist
+3. **Serve Story Beats**: Align with current story beat and direction
+4. **Provide Real Agency**: Each choice should lead to meaningfully different outcomes
+5. **Maintain Genre Tone**: Choices fit the {genre} genre
+
+## STORY CONTEXT
+
+- **Chapter**: {chapter_number}
+- **Protagonist**: {protagonist.get('name', 'N/A')}
+- **Current Story Beat**: {current_beat}
+- **Chapter Goal**: {chapter_goal}{choice_setup_context}
+
+## NARRATIVE ENDING
+
+The chapter ended with:
+
+```
+{narrative_ending}
+```
+
+## STORY BIBLE
+
+{json.dumps(story_bible, indent=2)}
+
+## CHOICE GENERATION GUIDELINES
+
+**Good Choices**:
+- ✅ Emerge naturally from the chapter's ending situation
+- ✅ Present meaningful dilemmas (not obvious right/wrong)
+- ✅ Each choice has clear consequences
+- ✅ Choices reflect character personality and growth
+- ✅ Advance the plot in different directions
+- ✅ Respect established character limitations and abilities
+
+**Avoid**:
+- ❌ Choices that break established canon (e.g., "walk to..." for wheelchair user)
+- ❌ Choices with obviously "correct" or "wrong" answers
+- ❌ Choices that are too similar in outcome
+- ❌ Choices that ignore the immediate narrative situation
+- ❌ Choices that feel forced or unnatural
+
+**Choice Types** (use 2-3 different types):
+- **Action**: Do something physical/immediate
+- **Relationship**: How to interact with another character
+- **Investigation**: Explore, search, analyze
+- **Moral Dilemma**: Competing values or loyalties
+- **Strategic**: Plan or approach to a problem
+- **Emotional**: Internal character decision
+
+## JSON FORMAT
+
+Return 3 choices as JSON:
+
+```json
+{{
+  "choices": [
+    {{
+      "id": "ch{chapter_number}_choice_1",
+      "text": "The choice text as the player will see it (2-3 sentences max)",
+      "choice_type": "action|relationship|investigation|moral|strategic|emotional",
+      "thematic_direction": "Brief note on where this choice leads the story",
+      "character_arc_impact": "How this choice affects protagonist's development",
+      "story_beat_alignment": "How this serves the current story beat"
+    }},
+    {{
+      "id": "ch{chapter_number}_choice_2",
+      "text": "Second choice text",
+      "choice_type": "...",
+      "thematic_direction": "...",
+      "character_arc_impact": "...",
+      "story_beat_alignment": "..."
+    }},
+    {{
+      "id": "ch{chapter_number}_choice_3",
+      "text": "Third choice text",
+      "choice_type": "...",
+      "thematic_direction": "...",
+      "character_arc_impact": "...",
+      "story_beat_alignment": "..."
+    }}
+  ],
+  "choice_rationale": "Brief explanation of why these 3 choices work together"
+}}
+```
+
+## IMPORTANT
+
+- Each choice text should be 2-3 sentences maximum (player-facing)
+- Choices should feel natural and immediate given the chapter ending
+- Vary the choice types (don't make all 3 the same type)
+- Consider protagonist's personality and established limitations
+- Make choices that create anticipation for the next chapter
+
+Generate 3 compelling choices now that give the player meaningful agency while serving the larger story.
+"""
+
+    return prompt

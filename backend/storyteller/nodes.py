@@ -1337,6 +1337,446 @@ async def story_beat_checkin_node(state: StoryState) -> dict[str, Any]:
         return {"current_story_beat": "unknown"}
 
 
+# ===== PHASE 3: CBA (Chapter Beat Agent) =====
+
+async def chapter_beat_agent_node(state: StoryState) -> dict[str, Any]:
+    """
+    CBA generates 6-beat chapter structure based on SSBA guidance.
+
+    This creates a detailed internal structure for the chapter with 6 beats,
+    each targeting ~400-450 words for a total of ~2,400-2,700 words.
+
+    Args:
+        state: Current story state with story_structure, SSBA guidance
+
+    Returns:
+        Updated state with chapter_beat_plan
+    """
+    import time
+    import json
+    from langchain_core.messages import HumanMessage
+    from langchain_anthropic import ChatAnthropic
+
+    start_time = time.time()
+
+    try:
+        chapter_number = state.get("chapter_number", 1)
+
+        print(f"\n{'='*70}")
+        print(f"CBA: PLANNING 6-BEAT STRUCTURE FOR CHAPTER {chapter_number}")
+        print(f"{'='*70}")
+
+        # Initialize LLM
+        llm = ChatAnthropic(
+            model=config.MODEL_NAME,
+            temperature=0.7,  # Creative planning
+            max_tokens=2000,  # Detailed beat plan
+            anthropic_api_key=config.ANTHROPIC_API_KEY,
+            timeout=30.0,
+        )
+
+        # Get context
+        from backend.storyteller.prompts_v2 import load_world_template, create_chapter_beat_prompt
+
+        world_id = state.get("world_id", "tfogwf")
+        world_template = load_world_template(world_id)
+        total_chapters = state.get("total_chapters", 30)
+        story_structure = state.get("story_structure", {})
+        ssba_guidance = state.get("_ssba_guidance", {})
+        story_bible = state.get("generated_story_bible", {})
+        last_choice = state.get("last_choice", None)
+        summaries = state.get("story_summary", [])
+
+        # Create prompt
+        prompt = create_chapter_beat_prompt(
+            world_template=world_template,
+            chapter_number=chapter_number,
+            total_chapters=total_chapters,
+            story_structure=story_structure,
+            ssba_guidance=ssba_guidance,
+            story_bible=story_bible,
+            last_choice=last_choice,
+            summaries=summaries
+        )
+
+        # Get chapter beat plan
+        llm_start = time.time()
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        llm_duration = time.time() - llm_start
+
+        print(f"✓ CBA response received ({llm_duration:.2f}s)")
+
+        # Parse JSON response
+        response_text = response.content.strip()
+
+        # Clean markdown if present
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+
+        try:
+            chapter_beat_plan = json.loads(response_text)
+            print(f"✓ Chapter beat plan parsed successfully")
+            print(f"  Chapter goal: {chapter_beat_plan.get('chapter_goal', 'N/A')[:60]}...")
+            print(f"  Number of beats: {len(chapter_beat_plan.get('chapter_beats', []))}")
+
+            # Show beat summary
+            beats = chapter_beat_plan.get('chapter_beats', [])
+            for beat in beats:
+                beat_name = beat.get('beat_name', 'unknown')
+                word_target = beat.get('word_target', 0)
+                print(f"    - Beat {beat.get('beat_number', '?')}: {beat_name} (~{word_target} words)")
+
+            elapsed = time.time() - start_time
+            print(f"⏱️  CBA planning time: {elapsed:.2f}s")
+
+            return {
+                "chapter_beat_plan": chapter_beat_plan
+            }
+
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse chapter beat plan JSON: {e}")
+            print(f"Response preview: {response_text[:200]}...")
+
+            # Return minimal fallback plan
+            fallback_plan = {
+                "chapter_beats": [
+                    {"beat_number": 1, "beat_name": "opening_hook", "word_target": 450, "description": "Opening"},
+                    {"beat_number": 2, "beat_name": "rising_action", "word_target": 450, "description": "Development"},
+                    {"beat_number": 3, "beat_name": "midpoint_twist", "word_target": 450, "description": "Twist"},
+                    {"beat_number": 4, "beat_name": "complications", "word_target": 450, "description": "Complications"},
+                    {"beat_number": 5, "beat_name": "tension_peak", "word_target": 450, "description": "Peak tension"},
+                    {"beat_number": 6, "beat_name": "resolution", "word_target": 450, "description": "Resolution"}
+                ],
+                "chapter_goal": "Advance story",
+                "chapter_tension": "Unknown",
+                "chapter_question": "What happens next?",
+                "setup_for_next": "Continue story",
+                "choice_setup": {"situation": "Decision point", "stakes": "Unknown", "suggested_choice_types": []}
+            }
+            return {
+                "chapter_beat_plan": fallback_plan
+            }
+
+    except Exception as e:
+        print(f"Error in chapter_beat_agent_node: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return minimal fallback
+        fallback_plan = {
+            "chapter_beats": [
+                {"beat_number": i, "beat_name": f"beat_{i}", "word_target": 450, "description": f"Beat {i}"}
+                for i in range(1, 7)
+            ],
+            "chapter_goal": "Error fallback",
+            "chapter_tension": "N/A",
+            "chapter_question": "N/A",
+            "setup_for_next": "N/A",
+            "choice_setup": {"situation": "N/A", "stakes": "N/A", "suggested_choice_types": []}
+        }
+        return {"chapter_beat_plan": fallback_plan}
+
+
+# ===== PHASE 4: CEA (Context Editor Agent) =====
+
+async def context_editor_agent_node(state: StoryState) -> dict[str, Any]:
+    """
+    CEA checks consistency using RAG and provides guidance for Prose Agent.
+
+    This node:
+    1. Gets consistency report from RAG
+    2. Analyzes potential contradictions
+    3. Provides guidance to PA
+    4. Flags major contradictions for SSBA
+
+    Args:
+        state: Current story state
+
+    Returns:
+        Updated state with consistency_report and inconsistency_flags
+    """
+    import time
+    import json
+    from langchain_core.messages import HumanMessage
+    from langchain_anthropic import ChatAnthropic
+
+    start_time = time.time()
+
+    try:
+        chapter_number = state.get("chapter_number", 1)
+        session_id = state.get("session_id", "")
+
+        print(f"\n{'='*70}")
+        print(f"CEA: CONSISTENCY CHECK FOR CHAPTER {chapter_number}")
+        print(f"{'='*70}")
+
+        # Get RAG consistency report
+        from backend.rag.consistency_checker import ConsistencyChecker
+
+        checker = ConsistencyChecker(session_id)
+        chapter_beat_plan = state.get("chapter_beat_plan", {})
+        story_bible = state.get("generated_story_bible", {})
+
+        rag_report = checker.get_consistency_report(
+            chapter_beat_plan=chapter_beat_plan,
+            story_bible=story_bible,
+            max_queries=5
+        )
+
+        print(f"✓ RAG consistency report generated")
+        print(f"  Checks performed: {rag_report.get('total_checks', 0)}")
+        print(f"  Relevant history items: {len(rag_report.get('relevant_history', []))}")
+        print(f"  Overall risk: {rag_report.get('overall_risk', 'none')}")
+
+        # Initialize LLM for CEA analysis
+        llm = ChatAnthropic(
+            model=config.MODEL_NAME,
+            temperature=0.3,  # Analytical, consistent
+            max_tokens=2000,
+            anthropic_api_key=config.ANTHROPIC_API_KEY,
+            timeout=30.0,
+        )
+
+        # Create consistency check prompt
+        from backend.storyteller.prompts_v2 import create_consistency_check_prompt
+
+        last_choice = state.get("last_choice", None)
+
+        prompt = create_consistency_check_prompt(
+            chapter_number=chapter_number,
+            chapter_beat_plan=chapter_beat_plan,
+            story_bible=story_bible,
+            consistency_report=rag_report,
+            last_choice=last_choice
+        )
+
+        # Get CEA analysis
+        llm_start = time.time()
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        llm_duration = time.time() - llm_start
+
+        print(f"✓ CEA analysis received ({llm_duration:.2f}s)")
+
+        # Parse JSON response
+        response_text = response.content.strip()
+
+        # Clean markdown if present
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+
+        try:
+            analysis = json.loads(response_text)
+
+            consistency_status = analysis.get("consistency_status", "clear")
+            minor_issues = analysis.get("minor_issues", [])
+            major_contradictions = analysis.get("major_contradictions", [])
+            inconsistency_flags = analysis.get("inconsistency_flags", [])
+
+            print(f"✓ Consistency analysis parsed")
+            print(f"  Status: {consistency_status}")
+            print(f"  Minor issues: {len(minor_issues)}")
+            print(f"  Major contradictions: {len(major_contradictions)}")
+            print(f"  Flags for SSBA: {len(inconsistency_flags)}")
+
+            # Store guidance for PA to use
+            guidance_for_pa = analysis.get("guidance_for_prose_agent", {})
+
+            elapsed = time.time() - start_time
+            print(f"⏱️  CEA consistency check time: {elapsed:.2f}s")
+
+            # Prepare consistency report for state
+            consistency_report = {
+                "status": consistency_status,
+                "minor_issues": minor_issues,
+                "major_contradictions": major_contradictions,
+                "guidance_for_pa": guidance_for_pa,
+                "rag_report": rag_report
+            }
+
+            # Add new inconsistency flags to existing ones
+            existing_flags = state.get("inconsistency_flags", [])
+            updated_flags = existing_flags + inconsistency_flags
+
+            return {
+                "consistency_report": consistency_report,
+                "inconsistency_flags": updated_flags,
+                "_cea_guidance": guidance_for_pa  # Temporary field for PA
+            }
+
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse CEA analysis JSON: {e}")
+            print(f"Response preview: {response_text[:200]}...")
+
+            # Return minimal report
+            return {
+                "consistency_report": {
+                    "status": "error",
+                    "minor_issues": [],
+                    "major_contradictions": [],
+                    "guidance_for_pa": {"general_guidance": "Generate chapter prose"},
+                    "rag_report": rag_report
+                },
+                "inconsistency_flags": state.get("inconsistency_flags", [])
+            }
+
+    except Exception as e:
+        print(f"Error in context_editor_agent_node: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "consistency_report": {
+                "status": "error",
+                "minor_issues": [],
+                "major_contradictions": [],
+                "guidance_for_pa": {"general_guidance": "Generate chapter prose"},
+                "rag_report": {}
+            }
+        }
+
+
+async def generate_chapter1_choices_node(state: StoryState) -> dict[str, Any]:
+    """
+    CEA generates player choices for Chapter 1 (after narrative is generated).
+
+    Args:
+        state: Current story state with generated narrative
+
+    Returns:
+        Updated state with generated_choices
+    """
+    import time
+    import json
+    from langchain_core.messages import HumanMessage
+    from langchain_anthropic import ChatAnthropic
+
+    start_time = time.time()
+
+    try:
+        print(f"\n{'='*70}")
+        print(f"CEA: GENERATING CHOICES FOR CHAPTER 1")
+        print(f"{'='*70}")
+
+        # Initialize LLM
+        llm = ChatAnthropic(
+            model=config.MODEL_NAME,
+            temperature=0.8,  # Creative choice generation
+            max_tokens=1500,
+            anthropic_api_key=config.ANTHROPIC_API_KEY,
+            timeout=25.0,
+        )
+
+        # Get context
+        from backend.storyteller.prompts_v2 import load_world_template, create_choice_generation_prompt
+
+        world_id = state.get("world_id", "tfogwf")
+        world_template = load_world_template(world_id)
+        chapter_number = state.get("chapter_number", 1)
+        narrative = state.get("generated_narrative", "")
+        story_bible = state.get("generated_story_bible", {})
+        chapter_beat_plan = state.get("chapter_beat_plan", {})
+        ssba_guidance = state.get("_ssba_guidance", {})
+
+        # Create prompt
+        prompt = create_choice_generation_prompt(
+            world_template=world_template,
+            chapter_number=chapter_number,
+            narrative=narrative,
+            story_bible=story_bible,
+            chapter_beat_plan=chapter_beat_plan,
+            ssba_guidance=ssba_guidance
+        )
+
+        # Generate choices
+        llm_start = time.time()
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        llm_duration = time.time() - llm_start
+
+        print(f"✓ CEA choice generation received ({llm_duration:.2f}s)")
+
+        # Parse JSON response
+        response_text = response.content.strip()
+
+        # Clean markdown if present
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+
+        try:
+            choices_data = json.loads(response_text)
+            choices = choices_data.get("choices", [])
+
+            print(f"✓ Choices generated successfully")
+            for i, choice in enumerate(choices, 1):
+                choice_type = choice.get("choice_type", "unknown")
+                print(f"  {i}. [{choice_type}] {choice.get('text', 'N/A')[:60]}...")
+
+            elapsed = time.time() - start_time
+            print(f"⏱️  CEA choice generation time: {elapsed:.2f}s")
+
+            return {
+                "generated_choices": choices
+            }
+
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse choices JSON: {e}")
+            print(f"Response preview: {response_text[:200]}...")
+
+            # Return fallback choices
+            fallback_choices = [
+                {
+                    "id": f"ch{chapter_number}_choice_1",
+                    "text": "Continue with the current approach.",
+                    "choice_type": "action"
+                },
+                {
+                    "id": f"ch{chapter_number}_choice_2",
+                    "text": "Take a moment to reconsider the situation.",
+                    "choice_type": "emotional"
+                },
+                {
+                    "id": f"ch{chapter_number}_choice_3",
+                    "text": "Seek advice or information before proceeding.",
+                    "choice_type": "investigation"
+                }
+            ]
+            return {"generated_choices": fallback_choices}
+
+    except Exception as e:
+        print(f"Error in generate_chapter1_choices_node: {e}")
+        import traceback
+        traceback.print_exc()
+
+        # Return minimal fallback
+        fallback_choices = [
+            {"id": "ch1_choice_1", "text": "Continue forward.", "choice_type": "action"},
+            {"id": "ch1_choice_2", "text": "Pause and reflect.", "choice_type": "emotional"},
+            {"id": "ch1_choice_3", "text": "Investigate further.", "choice_type": "investigation"}
+        ]
+        return {"generated_choices": fallback_choices}
+
+
+async def generate_choices_node(state: StoryState) -> dict[str, Any]:
+    """
+    CEA generates player choices for Chapters 2-30 (after narrative is generated).
+
+    This is the same as generate_chapter1_choices_node but may have different
+    context/considerations for later chapters.
+
+    Args:
+        state: Current story state with generated narrative
+
+    Returns:
+        Updated state with generated_choices
+    """
+    # For now, reuse the same logic as Chapter 1
+    # In the future, this could be different based on story progression
+    return await generate_chapter1_choices_node(state)
+
+
 # ===== Node 10: Extract Entities from Narrative =====
 
 async def extract_entities_node(state: StoryState) -> dict[str, Any]:
