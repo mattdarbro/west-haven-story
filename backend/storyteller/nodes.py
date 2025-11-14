@@ -1152,6 +1152,122 @@ def add_user_message_node(state: StoryState, user_input: str) -> dict[str, Any]:
     return {"messages": messages}
 
 
+# ===== Node 8: Extract Entities from Narrative =====
+
+async def extract_entities_node(state: StoryState) -> dict[str, Any]:
+    """
+    Extract entities from the narrative for RAG indexing.
+
+    This node splits the narrative into paragraphs and extracts entities
+    for metadata tagging.
+
+    Args:
+        state: Current story state with narrative_text
+
+    Returns:
+        Updated state with extracted entities (stored temporarily)
+    """
+    try:
+        from backend.rag.entity_extractor import EntityExtractor
+        from datetime import datetime
+
+        narrative = state.get("narrative_text", "")
+
+        if not narrative:
+            print("⚠️  No narrative to extract entities from")
+            return {}
+
+        # Split narrative into paragraphs
+        paragraphs = EntityExtractor.split_into_paragraphs(narrative)
+        print(f"✓ Split narrative into {len(paragraphs)} paragraphs")
+
+        # For now, use simple entity extraction (pattern matching)
+        # TODO: In production, use LLM-based extraction for better accuracy
+        entities = EntityExtractor.extract_entities_simple(narrative)
+        print(f"✓ Extracted entities: {len(entities.get('characters', []))} characters")
+
+        # Store paragraphs and entities temporarily for indexing node
+        # (We don't want to bloat the state, so we'll index and discard)
+        return {
+            "_temp_paragraphs": paragraphs,
+            "_temp_entities": entities
+        }
+
+    except Exception as e:
+        print(f"Error in extract_entities_node: {e}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
+
+# ===== Node 9: Index to RAG Vector Store =====
+
+async def index_to_rag_node(state: StoryState) -> dict[str, Any]:
+    """
+    Index extracted paragraphs and entities into RAG vector store.
+
+    Args:
+        state: Current story state with temporary paragraph/entity data
+
+    Returns:
+        Updated state with rag_chunks_indexed and last_rag_update
+    """
+    try:
+        from backend.rag.vector_store import VectorStore
+        from backend.rag.entity_extractor import EntityExtractor
+        from datetime import datetime
+
+        # Get temporary data from extract_entities_node
+        paragraphs = state.get("_temp_paragraphs", [])
+        entities = state.get("_temp_entities", {})
+
+        if not paragraphs:
+            print("⚠️  No paragraphs to index")
+            return {}
+
+        # Initialize vector store
+        vector_store = VectorStore()
+        session_id = state.get("user_id", "unknown")
+        chapter_number = state.get("chapter_number", 1)
+
+        # Get or create collection for this session
+        vector_store.get_or_create_collection(session_id)
+
+        # Create metadata for each paragraph
+        metadata_list = []
+        for i, paragraph in enumerate(paragraphs):
+            metadata = EntityExtractor.create_paragraph_metadata(
+                paragraph=paragraph,
+                paragraph_number=i,
+                chapter_number=chapter_number,
+                entities=entities
+            )
+            metadata_list.append(metadata)
+
+        # Add paragraphs to vector store
+        chunks_added = vector_store.add_paragraph_chunks(
+            paragraphs=paragraphs,
+            chapter_number=chapter_number,
+            metadata_list=metadata_list
+        )
+
+        # Update state with RAG metadata
+        total_chunks = vector_store.get_collection_count()
+
+        print(f"✓ RAG indexing complete: {chunks_added} new chunks, {total_chunks} total")
+
+        return {
+            "rag_chunks_indexed": total_chunks,
+            "last_rag_update": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        print(f"Error in index_to_rag_node: {e}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
+
 # ===== Conditional Edge Functions =====
 
 def should_generate_media(state: StoryState) -> str:
