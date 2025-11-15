@@ -9,7 +9,7 @@ import json
 from typing import Dict, Any
 from langchain_core.messages import HumanMessage
 from langchain_anthropic import ChatAnthropic
-from backend import config
+from backend.config import config
 from backend.storyteller.beat_templates import get_template
 from backend.storyteller.bible_enhancement import should_use_cliffhanger, should_include_cameo
 from backend.storyteller.prompts_standalone import (

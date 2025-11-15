@@ -8,7 +8,7 @@ import json
 from typing import Dict, Any
 from langchain_core.messages import HumanMessage
 from langchain_anthropic import ChatAnthropic
-from backend import config
+from backend.config import config
 
 
 async def enhance_story_bible(
