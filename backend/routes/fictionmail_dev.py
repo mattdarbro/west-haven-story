@@ -112,18 +112,24 @@ async def dev_add_cameo(data: CameoInput):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class GenerateStoryInput(BaseModel):
+    bible: Optional[Dict[str, Any]] = None
+    force_cliffhanger: Optional[bool] = None
+
+
 @app.post("/api/dev/generate-story")
-async def dev_generate_story(force_cliffhanger: Optional[bool] = None):
+async def dev_generate_story(data: GenerateStoryInput):
     """
     Step 2: Generate a standalone story.
     """
-    if not dev_storage["current_bible"]:
+    # Use bible from request body if provided, otherwise fall back to storage
+    bible = data.bible if data.bible else dev_storage["current_bible"]
+
+    if not bible:
         raise HTTPException(status_code=400, detail="No bible created yet. Complete onboarding first.")
 
     try:
         dev_storage["generation_logs"] = []
-
-        bible = dev_storage["current_bible"]
         tier = bible.get("user_tier", "free")
 
         log(f"Generating {tier} tier story...")
@@ -131,7 +137,7 @@ async def dev_generate_story(force_cliffhanger: Optional[bool] = None):
         result = await generate_standalone_story(
             story_bible=bible,
             user_tier=tier,
-            force_cliffhanger=force_cliffhanger,
+            force_cliffhanger=data.force_cliffhanger,
             dev_mode=True
         )
 
