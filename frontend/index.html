@@ -246,10 +246,16 @@
         async function generateStory() {
             log('Generating story (2-4 min)...');
             try {
+                if (!currentBible) {
+                    alert('No bible found. Please start over.');
+                    return;
+                }
+
                 log(`Calling: ${API_URL}/api/dev/generate-story`);
                 const res = await fetch(`${API_URL}/api/dev/generate-story`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ bible: currentBible })
                 });
 
                 log(`Response status: ${res.status} ${res.statusText}`);
