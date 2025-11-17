@@ -212,13 +212,21 @@ async def dev_generate_story(data: Optional[GenerateStoryInput] = Body(default=N
                         if audio_url.startswith("/audio/"):
                             audio_file_path = audio_url.replace("/audio/", "./generated_audio/")
 
+                    # Convert image URL to file path for attachment
+                    image_file_path = None
+                    if story_data.get("cover_image_url"):
+                        # Convert /images/filename.png to ./generated_images/filename.png
+                        image_url = story_data["cover_image_url"]
+                        if image_url.startswith("/images/"):
+                            image_file_path = image_url.replace("/images/", "./generated_images/")
+
                     # Send the story email
                     email_sent = await email_scheduler.send_story_email(
                         user_email=email,
                         story_title=story_data["title"],
                         story_narrative=story_data["narrative"],
                         audio_file_path=audio_file_path,
-                        image_url=story_data.get("cover_image_url"),
+                        image_file_path=image_file_path,
                         genre=story_data["genre"],
                         word_count=story_data["word_count"]
                     )
