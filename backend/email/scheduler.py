@@ -108,8 +108,10 @@ class EmailScheduler:
         story_narrative: str,
         audio_file_path: Optional[str],
         image_file_path: Optional[str],
+        video_file_path: Optional[str],
         genre: str,
-        word_count: int
+        word_count: int,
+        user_tier: str = "free"
     ) -> bool:
         """
         Send a standalone story email (FictionMail format).
@@ -120,8 +122,10 @@ class EmailScheduler:
             story_narrative: The complete story text
             audio_file_path: Local file path to the MP3 file (optional)
             image_file_path: Local file path to the cover image (optional)
+            video_file_path: Local file path to the MP4 video (optional, premium only)
             genre: Story genre
             word_count: Story word count
+            user_tier: User's subscription tier (free/premium)
 
         Returns:
             True if sent successfully, False otherwise
@@ -129,12 +133,15 @@ class EmailScheduler:
         # Check if files exist
         has_audio = audio_file_path is not None and os.path.exists(audio_file_path) if audio_file_path else False
         has_image = image_file_path is not None and os.path.exists(image_file_path) if image_file_path else False
+        has_video = video_file_path is not None and os.path.exists(video_file_path) if video_file_path else False
 
         html = self._render_story_email(
             story_title=story_title,
             story_narrative=story_narrative,
             has_audio=has_audio,
             has_image=has_image,
+            has_video=has_video,
+            user_tier=user_tier,
             genre=genre,
             word_count=word_count
         )
@@ -182,6 +189,22 @@ class EmailScheduler:
                     print(f"  ✓ Attached cover image: {image_filename}")
                 except Exception as e:
                     print(f"  ⚠️  Failed to attach image file: {e}")
+
+            # Attach video file if available (premium tier)
+            if has_video:
+                try:
+                    with open(video_file_path, "rb") as video_file:
+                        video_content = base64.b64encode(video_file.read()).decode('utf-8')
+
+                    video_filename = os.path.basename(video_file_path)
+                    attachments.append({
+                        "content": video_content,
+                        "filename": video_filename
+                    })
+                    video_size_mb = os.path.getsize(video_file_path) / (1024 * 1024)
+                    print(f"  ✓ Attached video: {video_filename} ({video_size_mb:.2f} MB)")
+                except Exception as e:
+                    print(f"  ⚠️  Failed to attach video file: {e}")
 
             if attachments:
                 params["attachments"] = attachments
@@ -383,14 +406,35 @@ class EmailScheduler:
         story_narrative: str,
         has_audio: bool,
         has_image: bool,
+        has_video: bool,
+        user_tier: str,
         genre: str,
         word_count: int
     ) -> str:
         """Generate HTML for standalone story email (FictionMail)"""
 
+        # Optional video section (premium tier - attached file)
+        video_section = ""
+        if has_video:
+            video_section = f'''
+            <div style="margin: 30px 0; padding: 30px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 12px; text-align: center;">
+              <h3 style="color: white; margin: 0 0 15px 0; font-size: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                🎥 Premium Video Attached
+              </h3>
+              <p style="margin: 0; font-size: 16px; color: rgba(255,255,255,0.95); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.6;">
+                Your story includes a beautiful MP4 video combining<br>
+                the cover art with professional narration!
+              </p>
+              <p style="margin: 15px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.85); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                📲 Download and play on any device<br>
+                Perfect for your commute or relaxing at home
+              </p>
+            </div>
+            '''
+
         # Optional image section (attached file)
         image_section = ""
-        if has_image:
+        if has_image and not has_video:  # Only show image notice if no video (video includes image)
             image_section = f'''
             <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #764ba2 0%, #667eea 100%); border-radius: 12px; text-align: center;">
               <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
@@ -456,6 +500,9 @@ class EmailScheduler:
                 {genre.upper()} • {word_count} words • {reading_time} min read
               </p>
             </div>
+
+            <!-- Premium Video (if available) -->
+            {video_section}
 
             <!-- Cover Image -->
             {image_section}

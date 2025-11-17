@@ -220,6 +220,9 @@ async def dev_generate_story(data: Optional[GenerateStoryInput] = Body(default=N
                         if image_url.startswith("/images/"):
                             image_file_path = image_url.replace("/images/", "./generated_images/")
 
+                    # Get video file path (premium tier)
+                    video_file_path = story_data.get("video_file_path")  # Already a full path
+
                     # Send the story email
                     email_sent = await email_scheduler.send_story_email(
                         user_email=email,
@@ -227,8 +230,10 @@ async def dev_generate_story(data: Optional[GenerateStoryInput] = Body(default=N
                         story_narrative=story_data["narrative"],
                         audio_file_path=audio_file_path,
                         image_file_path=image_file_path,
+                        video_file_path=video_file_path,
                         genre=story_data["genre"],
-                        word_count=story_data["word_count"]
+                        word_count=story_data["word_count"],
+                        user_tier=story_data["tier"]
                     )
 
                     await email_db.close()
