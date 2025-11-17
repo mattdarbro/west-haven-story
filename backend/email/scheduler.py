@@ -107,7 +107,7 @@ class EmailScheduler:
         story_title: str,
         story_narrative: str,
         audio_file_path: Optional[str],
-        image_url: Optional[str],
+        image_file_path: Optional[str],
         genre: str,
         word_count: int
     ) -> bool:
@@ -119,21 +119,22 @@ class EmailScheduler:
             story_title: Title of the story
             story_narrative: The complete story text
             audio_file_path: Local file path to the MP3 file (optional)
-            image_url: URL to cover image (optional)
+            image_file_path: Local file path to the cover image (optional)
             genre: Story genre
             word_count: Story word count
 
         Returns:
             True if sent successfully, False otherwise
         """
-        # Include audio attachment status in HTML
+        # Check if files exist
         has_audio = audio_file_path is not None and os.path.exists(audio_file_path) if audio_file_path else False
+        has_image = image_file_path is not None and os.path.exists(image_file_path) if image_file_path else False
 
         html = self._render_story_email(
             story_title=story_title,
             story_narrative=story_narrative,
             has_audio=has_audio,
-            image_url=image_url,
+            has_image=has_image,
             genre=genre,
             word_count=word_count
         )
@@ -150,24 +151,40 @@ class EmailScheduler:
                 "html": html,
             }
 
+            attachments = []
+
             # Attach audio file if available
             if has_audio:
                 try:
                     with open(audio_file_path, "rb") as audio_file:
                         audio_content = base64.b64encode(audio_file.read()).decode('utf-8')
 
-                    # Extract filename from path
                     audio_filename = os.path.basename(audio_file_path)
-
-                    params["attachments"] = [
-                        {
-                            "content": audio_content,
-                            "filename": audio_filename
-                        }
-                    ]
+                    attachments.append({
+                        "content": audio_content,
+                        "filename": audio_filename
+                    })
                     print(f"  ✓ Attached audio file: {audio_filename}")
                 except Exception as e:
                     print(f"  ⚠️  Failed to attach audio file: {e}")
+
+            # Attach image file if available
+            if has_image:
+                try:
+                    with open(image_file_path, "rb") as image_file:
+                        image_content = base64.b64encode(image_file.read()).decode('utf-8')
+
+                    image_filename = os.path.basename(image_file_path)
+                    attachments.append({
+                        "content": image_content,
+                        "filename": image_filename
+                    })
+                    print(f"  ✓ Attached cover image: {image_filename}")
+                except Exception as e:
+                    print(f"  ⚠️  Failed to attach image file: {e}")
+
+            if attachments:
+                params["attachments"] = attachments
 
             resend.Emails.send(params)
             print(f"✅ Sent story '{story_title}' to {user_email}")
@@ -365,24 +382,24 @@ class EmailScheduler:
         story_title: str,
         story_narrative: str,
         has_audio: bool,
-        image_url: Optional[str],
+        has_image: bool,
         genre: str,
         word_count: int
     ) -> str:
         """Generate HTML for standalone story email (FictionMail)"""
 
-        # Get base URL from environment
-        base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
-
-        # Optional image section
+        # Optional image section (attached file)
         image_section = ""
-        if image_url:
-            full_image_url = f"{base_url}{image_url}" if image_url.startswith("/") else image_url
+        if has_image:
             image_section = f'''
-            <div style="margin: 30px 0;">
-              <img src="{full_image_url}"
-                   alt="{story_title}"
-                   style="width: 100%; max-width: 600px; border-radius: 12px; display: block;">
+            <div style="margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #764ba2 0%, #667eea 100%); border-radius: 12px; text-align: center;">
+              <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                🎨 Cover Art Attached
+              </h3>
+              <p style="margin: 0; font-size: 15px; color: rgba(255,255,255,0.95); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                A custom cover image is attached to this email.<br>
+                View it in your attachments!
+              </p>
             </div>
             '''
 
