@@ -359,14 +359,20 @@ class EmailScheduler:
     ) -> str:
         """Generate HTML for standalone story email (FictionMail) with inline content"""
 
-        # Get base URL from environment
-        base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+        # Get base URL from environment and strip trailing slash
+        base_url = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip('/')
 
         # Inline cover image (shown prominently at top)
         image_section = ""
         if image_url:
-            # Construct full URL
-            full_image_url = f"{base_url}{image_url}" if image_url.startswith('/') else image_url
+            # Construct full URL (handle both relative and absolute URLs)
+            if image_url.startswith('http'):
+                full_image_url = image_url
+            else:
+                # Ensure single slash between base and path
+                path = image_url.lstrip('/')
+                full_image_url = f"{base_url}/{path}"
+
             image_section = f'''
             <div style="margin: 30px 0; text-align: center;">
               <img src="{full_image_url}"
@@ -378,8 +384,13 @@ class EmailScheduler:
         # Inline audio player (beautiful design with controls)
         audio_section = ""
         if audio_url:
-            # Construct full URL
-            full_audio_url = f"{base_url}{audio_url}" if audio_url.startswith('/') else audio_url
+            # Construct full URL (handle both relative and absolute URLs)
+            if audio_url.startswith('http'):
+                full_audio_url = audio_url
+            else:
+                # Ensure single slash between base and path
+                path = audio_url.lstrip('/')
+                full_audio_url = f"{base_url}/{path}"
             audio_section = f'''
             <div style="margin: 30px 0; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);">
               <div style="text-align: center; margin-bottom: 20px;">
