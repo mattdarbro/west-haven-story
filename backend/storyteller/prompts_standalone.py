@@ -1,5 +1,5 @@
 """
-Prompts for standalone story generation (FictionMail).
+Prompts for standalone story generation (FixionMail).
 
 These replace the chapter-based prompts for the daily story service.
 """
@@ -146,7 +146,7 @@ This story should have satisfying closure:
 - Guidance: {guidance}
 """
 
-    prompt = f"""You are the Chapter Beat Agent (CBA) planning a complete standalone story for FictionMail.
+    prompt = f"""You are the Chapter Beat Agent (CBA) planning a complete standalone story for FixionMail.
 
 ## YOUR TASK
 
@@ -289,7 +289,7 @@ def create_prose_generation_prompt(
         if avoid:
             cea_guidance += f"\n\n**Avoid**: {', '.join(avoid)}"
 
-    prompt = f"""You are the Prose Agent generating a complete {genre} story for FictionMail.
+    prompt = f"""You are the Prose Agent generating a complete {genre} story for FixionMail.
 
 ## YOUR TASK
 
