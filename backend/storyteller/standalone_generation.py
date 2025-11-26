@@ -1,5 +1,5 @@
 """
-Main story generation workflow for FictionMail standalone stories.
+Main story generation workflow for FixionMail standalone stories.
 
 This orchestrates the multi-agent system for daily story generation.
 """

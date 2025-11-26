@@ -49,13 +49,13 @@ except Exception as e:
     email_choice_router = None
     routes_loaded = False
 
-# Import FictionMail dev router
+# Import FixionMail dev router
 try:
     from backend.routes.fictionmail_dev import router as fictionmail_router
     fictionmail_loaded = True
-    print("✓ FictionMail dev router imported")
+    print("✓ FixionMail dev router imported")
 except Exception as e:
-    print(f"⚠️  FictionMail dev router loading failed: {e}")
+    print(f"⚠️  FixionMail dev router loading failed: {e}")
     import traceback
     traceback.print_exc()
     fictionmail_router = None
@@ -86,12 +86,12 @@ if routes_loaded and router:
 else:
     print("⚠️  Skipping routes registration due to initialization failure")
 
-# Include FictionMail dev router
+# Include FixionMail dev router
 if fictionmail_loaded and fictionmail_router:
     app.include_router(fictionmail_router)
-    print("✓ FictionMail dev routes registered")
+    print("✓ FixionMail dev routes registered")
 else:
-    print("⚠️  Skipping FictionMail dev routes")
+    print("⚠️  Skipping FixionMail dev routes")
 
 # Mount static files for generated media
 # Create directories if they don't exist
@@ -120,7 +120,7 @@ async def root():
 async def api_info():
     """API information endpoint."""
     return {
-        "name": "FictionMail API",
+        "name": "FixionMail API",
         "version": "3.0.0",
         "status": "operational",
         "mode": "Standalone Daily Stories",
@@ -284,10 +284,10 @@ async def startup_event():
         #         print("✓ Story graph initialization complete")
         #     except Exception as e:
         #         print(f"⚠️  Error initializing story graph during startup: {e}")
-        print("ℹ️  Story graph (Iteration 1) not loaded - using FictionMail standalone generation")
+        print("ℹ️  Story graph (Iteration 1) not loaded - using FixionMail standalone generation")
 
         # ARCHIVED: Email system from routes.py (Iteration 1)
-        # FictionMail will implement its own email integration
+        # FixionMail will implement its own email integration
         # if routes_loaded:
         #     try:
         #         from backend.api.routes import initialize_email_system
@@ -296,10 +296,10 @@ async def startup_event():
         #         print("✓ Email system initialization complete")
         #     except Exception as e:
         #         print(f"⚠️  Error initializing email system during startup: {e}")
-        print("ℹ️  Email system will be initialized by FictionMail when needed")
+        print("ℹ️  Email system will be initialized by FixionMail when needed")
 
         # ARCHIVED: Background email processor (Iteration 1)
-        # Will be re-implemented for FictionMail daily stories
+        # Will be re-implemented for FixionMail daily stories
         # if routes_loaded and os.getenv("ENABLE_EMAIL_SCHEDULER", "true").lower() == "true":
         #     try:
         #         from backend.email.background import start_background_processor
@@ -308,7 +308,7 @@ async def startup_event():
         #         print("✓ Background email processor started")
         #     except Exception as e:
         #         print(f"⚠️  Error starting background email processor: {e}")
-        print("ℹ️  Background email processor not loaded - will be added for FictionMail daily delivery")
+        print("ℹ️  Background email processor not loaded - will be added for FixionMail daily delivery")
 
         # Validate world templates exist (no longer using RAG)
         try:
@@ -344,7 +344,7 @@ async def shutdown_event():
     """Cleanup on shutdown."""
     try:
         print("\n" + "=" * 60)
-        print("FictionMail API Shutting Down...")
+        print("FixionMail API Shutting Down...")
         print("=" * 60)
 
         # ARCHIVED: Background email processor (Iteration 1)
