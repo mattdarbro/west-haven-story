@@ -210,49 +210,72 @@ async def generate_story_audio_openai(
                 response.stream_to_file(chunk_filepath)
                 audio_chunks.append(chunk_filepath)
 
-            # Concatenate using ffmpeg
+            # Concatenate audio chunks
             print(f"  Concatenating {len(audio_chunks)} audio chunks...")
             import subprocess
+            import shutil
 
-            # Create a file list for ffmpeg
-            list_file = f"./generated_audio/concat_list_{timestamp}.txt"
-            with open(list_file, 'w') as f:
-                for chunk_file in audio_chunks:
-                    f.write(f"file '{os.path.basename(chunk_file)}'\n")
+            # Check if ffmpeg is available
+            ffmpeg_available = shutil.which('ffmpeg') is not None
 
-            # Run ffmpeg concat - use basenames since we run from generated_audio dir
-            list_basename = os.path.basename(list_file)
-            output_basename = os.path.basename(filepath)
+            if ffmpeg_available:
+                # Use ffmpeg for high-quality concatenation
+                print(f"  Using ffmpeg for concatenation...")
 
-            ffmpeg_cmd = [
-                'ffmpeg',
-                '-f', 'concat',
-                '-safe', '0',
-                '-i', list_basename,
-                '-c', 'copy',
-                '-y',
-                output_basename
-            ]
+                # Create a file list for ffmpeg
+                list_file = f"./generated_audio/concat_list_{timestamp}.txt"
+                with open(list_file, 'w') as f:
+                    for chunk_file in audio_chunks:
+                        f.write(f"file '{os.path.basename(chunk_file)}'\n")
 
-            print(f"  Running ffmpeg: {' '.join(ffmpeg_cmd)}")
+                # Run ffmpeg concat - use basenames since we run from generated_audio dir
+                list_basename = os.path.basename(list_file)
+                output_basename = os.path.basename(filepath)
 
-            result = subprocess.run(
-                ffmpeg_cmd,
-                capture_output=True,
-                text=True,
-                cwd="./generated_audio"
-            )
+                ffmpeg_cmd = [
+                    'ffmpeg',
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', list_basename,
+                    '-c', 'copy',
+                    '-y',
+                    output_basename
+                ]
 
-            # Clean up temp files
-            os.remove(list_file)
+                print(f"  Running ffmpeg: {' '.join(ffmpeg_cmd)}")
+
+                result = subprocess.run(
+                    ffmpeg_cmd,
+                    capture_output=True,
+                    text=True,
+                    cwd="./generated_audio"
+                )
+
+                # Clean up list file
+                os.remove(list_file)
+
+                if result.returncode != 0:
+                    print(f"  ⚠️  ffmpeg concat error: {result.stderr}")
+                    # Fall through to binary concat as backup
+                    ffmpeg_available = False
+                else:
+                    print(f"  ✓ Successfully concatenated {len(audio_chunks)} chunks with ffmpeg")
+
+            if not ffmpeg_available:
+                # Fallback: Simple binary concatenation (works for MP3 frame-based format)
+                print(f"  Using binary concatenation (ffmpeg not available)...")
+
+                with open(filepath, 'wb') as outfile:
+                    for chunk_file in audio_chunks:
+                        with open(chunk_file, 'rb') as infile:
+                            outfile.write(infile.read())
+
+                print(f"  ✓ Successfully concatenated {len(audio_chunks)} chunks (binary)")
+
+            # Clean up temp chunk files
             for chunk_file in audio_chunks:
-                os.remove(chunk_file)
-
-            if result.returncode != 0:
-                print(f"  ⚠️  ffmpeg concat error: {result.stderr}")
-                return None
-
-            print(f"  ✓ Successfully concatenated {len(audio_chunks)} chunks")
+                if os.path.exists(chunk_file):
+                    os.remove(chunk_file)
 
         # Upload to storage backend (Supabase in prod, local in dev)
         from backend.storage import upload_audio
