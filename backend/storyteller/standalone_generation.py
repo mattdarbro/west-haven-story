@@ -1,5 +1,5 @@
 """
-Main story generation workflow for FictionMail standalone stories.
+Main story generation workflow for FixionMail standalone stories.
 
 This orchestrates the multi-agent system for daily story generation.
 """
@@ -464,113 +464,6 @@ async def generate_story_image(
         return None
 
 
-async def generate_story_video(
-    audio_file_path: str,
-    image_file_path: str,
-    story_title: str,
-    genre: str
-) -> str | None:
-    """
-    Generate video file combining cover image with audio narration using ffmpeg.
-
-    Args:
-        audio_file_path: Path to the MP3 audio file
-        image_file_path: Path to the cover image
-        story_title: Title of the story (for filename)
-        genre: Story genre
-
-    Returns:
-        Local file path to video file, or None if generation fails
-    """
-    try:
-        import subprocess
-
-        # Check if files exist
-        if not os.path.exists(audio_file_path):
-            print(f"  ⚠️  Audio file not found: {audio_file_path}")
-            return None
-
-        if not os.path.exists(image_file_path):
-            print(f"  ⚠️  Image file not found: {image_file_path}")
-            return None
-
-        # Create video directory if it doesn't exist
-        os.makedirs("./generated_videos", exist_ok=True)
-
-        # Generate filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        clean_title = "".join(c for c in story_title if c.isalnum() or c in (' ', '-', '_')).strip()
-        clean_title = clean_title.replace(' ', '_')[:50]
-        filename = f"{genre}_{clean_title}_{timestamp}.mp4"
-        output_path = f"./generated_videos/{filename}"
-
-        print(f"  Generating video with ffmpeg...")
-
-        # ffmpeg command to combine static image with audio
-        # -loop 1: Loop the image
-        # -i image: Input image
-        # -i audio: Input audio
-        # -c:v libx264: H.264 video codec
-        # -tune stillimage: Optimize for static image
-        # -c:a aac: AAC audio codec
-        # -b:a 192k: Audio bitrate
-        # -pix_fmt yuv420p: Pixel format for compatibility
-        # -shortest: End video when audio ends
-        # -movflags +faststart: Optimize for streaming/email
-
-        ffmpeg_cmd = [
-            'ffmpeg',
-            '-loop', '1',
-            '-i', image_file_path,
-            '-i', audio_file_path,
-            '-c:v', 'libx264',
-            '-tune', 'stillimage',
-            '-c:a', 'aac',
-            '-b:a', '192k',
-            '-pix_fmt', 'yuv420p',
-            '-shortest',
-            '-movflags', '+faststart',
-            '-y',  # Overwrite output file if exists
-            output_path
-        ]
-
-        # Run ffmpeg
-        result = subprocess.run(
-            ffmpeg_cmd,
-            capture_output=True,
-            text=True,
-            timeout=300  # 5 minute timeout
-        )
-
-        if result.returncode != 0:
-            print(f"  ⚠️  ffmpeg error: {result.stderr}")
-            return None
-
-        # Verify output file was created
-        if not os.path.exists(output_path):
-            print(f"  ⚠️  Video file was not created")
-            return None
-
-        file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
-        print(f"  ✓ Video generated successfully")
-        print(f"    Saved to: {output_path}")
-        print(f"    File size: {file_size_mb:.2f} MB")
-
-        return output_path
-
-    except FileNotFoundError:
-        print("  ⚠️  ffmpeg not found. Install with: apt-get install ffmpeg")
-        return None
-    except subprocess.TimeoutExpired:
-        print("  ⚠️  Video generation timed out (took > 5 minutes)")
-        return None
-    except Exception as e:
-        print(f"  ⚠️  Video generation failed: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-
 async def generate_standalone_story(
     story_bible: Dict[str, Any],
     user_tier: str = "free",
@@ -696,7 +589,8 @@ async def generate_standalone_story(
             beat_plan=beat_plan,
             story_bible=story_bible,
             template=template,
-            consistency_guidance=consistency_report.get("guidance_for_pa", {})
+            consistency_guidance=consistency_report.get("guidance_for_pa", {}),
+            cameo=cameo
         )
 
         word_count = len(narrative.split())
@@ -745,27 +639,6 @@ async def generate_standalone_story(
                 voice=effective_voice
             )
 
-        # Step 8.5: Generate video (combine image + audio for premium tier)
-        # Only generate video if we have both audio and image
-        video_file_path = None
-        if should_generate_media and audio_url and cover_image_url:
-            print(f"\n{'─'*70}")
-            print(f"GENERATING VIDEO (IMAGE + AUDIO)")
-            if dev_mode:
-                print(f"(Dev mode: generating for {user_tier} tier)")
-            print(f"{'─'*70}")
-
-            # Convert URLs to file paths
-            audio_file_path = audio_url.replace("/audio/", "./generated_audio/")
-            image_file_path = cover_image_url.replace("/images/", "./generated_images/")
-
-            video_file_path = await generate_story_video(
-                audio_file_path=audio_file_path,
-                image_file_path=image_file_path,
-                story_title=story_title,
-                genre=genre
-            )
-
         # Step 9: Create summary
         summary = f"{story_title}: {beat_plan.get('story_premise', 'A story in this world')}"
 
@@ -788,7 +661,6 @@ async def generate_standalone_story(
                 "is_cliffhanger": is_cliffhanger,
                 "cover_image_url": cover_image_url,
                 "audio_url": audio_url,
-                "video_file_path": video_file_path,  # Full path to MP4 file
                 "audio_duration_seconds": None  # TODO: calculate from audio
             },
             "metadata": {
@@ -918,7 +790,8 @@ async def generate_prose(
     beat_plan: Dict[str, Any],
     story_bible: Dict[str, Any],
     template: Any,
-    consistency_guidance: Dict[str, Any] = None
+    consistency_guidance: Dict[str, Any] = None,
+    cameo: Dict[str, Any] = None
 ) -> str:
     """
     PA: Generate prose from beat plan.
@@ -930,7 +803,8 @@ async def generate_prose(
         beat_plan=beat_plan,
         story_bible=story_bible,
         beat_template=template.to_dict(),
-        consistency_guidance=consistency_guidance
+        consistency_guidance=consistency_guidance,
+        cameo=cameo
     )
 
     # Initialize LLM with extended output

@@ -113,7 +113,7 @@ class EmailScheduler:
         user_tier: str = "free"
     ) -> bool:
         """
-        Send a standalone story email (FictionMail format) with inline content.
+        Send a standalone story email (FixionMail format) with inline content.
 
         Args:
             user_email: Recipient email address
@@ -374,7 +374,7 @@ class EmailScheduler:
         genre: str,
         word_count: int
     ) -> str:
-        """Generate HTML for standalone story email (FictionMail) with inline content"""
+        """Generate HTML for standalone story email (FixionMail) with inline content"""
 
         # Get base URL from environment and strip trailing slash
         base_url = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip('/')
@@ -522,7 +522,7 @@ class EmailScheduler:
 
             <!-- Branding -->
             <p style="text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-              FictionMail • Daily Stories Delivered to Your Inbox
+              FixionMail • Daily Stories Delivered to Your Inbox
             </p>
           </div>
         </body>

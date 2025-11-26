@@ -1,5 +1,5 @@
 """
-FictionMail Dev Dashboard - Simple API routes for testing.
+FixionMail Dev Dashboard - Simple API routes for testing.
 
 Run with: uvicorn backend.routes.fictionmail_dev:app --reload
 Then visit: http://localhost:8000/dev
@@ -29,10 +29,10 @@ from backend.storyteller.cost_calculator import (
 from backend.storyteller.beat_templates import list_beat_structures, get_beat_structure_info
 
 # Create router for use in main.py
-router = APIRouter(prefix="/api/dev", tags=["FictionMail Dev"])
+router = APIRouter(prefix="/api/dev", tags=["FixionMail Dev"])
 
 # Create standalone app for local testing
-app = FastAPI(title="FictionMail Dev Dashboard")
+app = FastAPI(title="FixionMail Dev Dashboard")
 
 # In-memory storage for dev (replace with DB later)
 dev_storage = {
@@ -508,7 +508,7 @@ async def dev_dashboard():
 <!DOCTYPE html>
 <html>
 <head>
-    <title>FictionMail Dev Dashboard</title>
+    <title>FixionMail Dev Dashboard</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -753,7 +753,7 @@ async def dev_dashboard():
 <body>
     <div class="container">
         <header>
-            <h1>📧 FictionMail Dev Dashboard</h1>
+            <h1>📧 FixionMail Dev Dashboard</h1>
             <p class="subtitle">Test the complete story generation flow with visible debug info</p>
         </header>
 
@@ -1111,7 +1111,7 @@ def log(message: str):
 if __name__ == "__main__":
     import uvicorn
     print("\n" + "="*70)
-    print("FictionMail Dev Dashboard")
+    print("FixionMail Dev Dashboard")
     print("="*70)
     print("\nStarting server...")
     print("Visit: http://localhost:8000/dev")

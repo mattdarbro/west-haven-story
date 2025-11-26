@@ -1,5 +1,5 @@
 """
-Prompts for standalone story generation (FictionMail).
+Prompts for standalone story generation (FixionMail).
 
 These replace the chapter-based prompts for the daily story service.
 """
@@ -146,7 +146,7 @@ This story should have satisfying closure:
 - Guidance: {guidance}
 """
 
-    prompt = f"""You are the Chapter Beat Agent (CBA) planning a complete standalone story for FictionMail.
+    prompt = f"""You are the Chapter Beat Agent (CBA) planning a complete standalone story for FixionMail.
 
 ## YOUR TASK
 
@@ -244,7 +244,8 @@ def create_prose_generation_prompt(
     beat_plan: dict,
     story_bible: dict,
     beat_template: dict,
-    consistency_guidance: dict = None
+    consistency_guidance: dict = None,
+    cameo: dict = None
 ) -> str:
     """
     Create prompt for Prose Agent to generate story from beat plan.
@@ -254,6 +255,7 @@ def create_prose_generation_prompt(
         story_bible: Story bible
         beat_template: Template used
         consistency_guidance: Optional guidance from CEA
+        cameo: Optional cameo character to include
 
     Returns:
         Formatted prompt for PA
@@ -266,6 +268,10 @@ def create_prose_generation_prompt(
     # Handle both recurring characters and AI-generated
     has_recurring_chars = genre_config.get("characters") == "user" or "protagonist" in story_bible
     protagonist = story_bible.get("protagonist", story_bible.get("character_template", {}))
+
+    # Get main characters and supporting characters for recurring character genres
+    main_characters = story_bible.get("main_characters", [])
+    supporting_characters = story_bible.get("supporting_characters", story_bible.get("supporting_cast_template", []))
 
     # Extract CEA guidance if present
     cea_guidance = ""
@@ -283,7 +289,7 @@ def create_prose_generation_prompt(
         if avoid:
             cea_guidance += f"\n\n**Avoid**: {', '.join(avoid)}"
 
-    prompt = f"""You are the Prose Agent generating a complete {genre} story for FictionMail.
+    prompt = f"""You are the Prose Agent generating a complete {genre} story for FixionMail.
 
 ## YOUR TASK
 
@@ -308,6 +314,26 @@ This should be polished, engaging prose ready for readers to enjoy.
 **CRITICAL**: {protagonist.get('defining_characteristic', 'N/A')} - This MUST be reflected consistently in the prose.
 {"" if has_recurring_chars else "Give your protagonist a unique, memorable name and specific details that fit this story."}
 
+{f'''## MAIN CHARACTERS (MUST appear in the story)
+
+These are the user's recurring characters. They MUST appear in this story with their established traits:
+
+{json.dumps(main_characters, indent=2)}
+
+**IMPORTANT**: Use these exact character names and personalities. The reader expects to see these specific characters in every story.
+''' if main_characters else ''}
+{f'''## SUPPORTING CHARACTERS
+
+{json.dumps(supporting_characters, indent=2)}
+''' if supporting_characters else ''}
+{f'''## CAMEO CHARACTER
+
+Include a brief cameo appearance by this character:
+- **Name**: {cameo.get('name', 'N/A')}
+- **Description**: {cameo.get('description', 'N/A')}
+
+**Guidance**: Work this character into the story naturally - a brief interaction, background appearance, or passing mention. Don't force it if it doesn't fit, but try to include them in one of the middle beats.
+''' if cameo else ''}
 ## BEAT PLAN
 
 {json.dumps(beat_plan.get('beats', []), indent=2)}

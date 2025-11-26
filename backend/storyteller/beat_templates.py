@@ -1450,7 +1450,7 @@ BEAT_STRUCTURES = {
     "classic": {
         "id": "classic",
         "name": "Classic Genre Structure",
-        "author": "FictionMail",
+        "author": "FixionMail",
         "description": "Genre-optimized beats tailored for each story type (sci-fi, mystery, romance, etc.)",
         "best_for": ["All genres", "Genre-specific conventions", "Reader expectations"],
         "short_template": None,  # Uses genre-specific templates
