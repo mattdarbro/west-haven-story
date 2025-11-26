@@ -220,16 +220,21 @@ async def generate_story_audio_openai(
                 for chunk_file in audio_chunks:
                     f.write(f"file '{os.path.basename(chunk_file)}'\n")
 
-            # Run ffmpeg concat
+            # Run ffmpeg concat - use basenames since we run from generated_audio dir
+            list_basename = os.path.basename(list_file)
+            output_basename = os.path.basename(filepath)
+
             ffmpeg_cmd = [
                 'ffmpeg',
                 '-f', 'concat',
                 '-safe', '0',
-                '-i', list_file,
+                '-i', list_basename,
                 '-c', 'copy',
                 '-y',
-                filepath
+                output_basename
             ]
+
+            print(f"  Running ffmpeg: {' '.join(ffmpeg_cmd)}")
 
             result = subprocess.run(
                 ffmpeg_cmd,
@@ -246,6 +251,8 @@ async def generate_story_audio_openai(
             if result.returncode != 0:
                 print(f"  ⚠️  ffmpeg concat error: {result.stderr}")
                 return None
+
+            print(f"  ✓ Successfully concatenated {len(audio_chunks)} chunks")
 
         # Upload to storage backend (Supabase in prod, local in dev)
         from backend.storage import upload_audio
