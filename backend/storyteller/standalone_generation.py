@@ -48,21 +48,9 @@ async def generate_story_audio(
         # Clean and prepare text for narration
         narrative_text = narrative.strip()
 
-        # ElevenLabs Flash v2.5 supports up to 40,000 characters
-        MAX_AUDIO_CHARS = 20000
-
-        if len(narrative_text) > MAX_AUDIO_CHARS:
-            print(f"  ⚠️  Narrative is {len(narrative_text)} chars, truncating to {MAX_AUDIO_CHARS}")
-            # Try to truncate at a sentence boundary
-            truncated = narrative_text[:MAX_AUDIO_CHARS]
-            last_period = truncated.rfind('. ')
-            if last_period > MAX_AUDIO_CHARS - 500:
-                narrative_text = truncated[:last_period + 1]
-            else:
-                narrative_text = truncated + "..."
-            print(f"  Truncated to {len(narrative_text)} chars")
-        else:
-            print(f"  ✓ Narrative is {len(narrative_text)} chars, within limit (max 40K)")
+        # ElevenLabs Flash v2.5 supports up to 40,000 characters per request
+        # We'll chunk at 20,000 for safety and concatenate
+        MAX_CHUNK_CHARS = 20000
 
         # Create ElevenLabs client
         client = ElevenLabs(api_key=config.ELEVENLABS_API_KEY)
@@ -71,32 +59,120 @@ async def generate_story_audio(
         selected_voice_id = voice_id or config.ELEVENLABS_VOICE_ID
         print(f"  Using voice ID: {selected_voice_id}")
 
-        # Generate audio using Flash v2.5
-        audio_generator = client.text_to_speech.convert(
-            voice_id=selected_voice_id,
-            text=narrative_text,
-            model_id="eleven_flash_v2_5",
-            voice_settings={
-                "stability": 0.5,
-                "similarity_boost": 0.75
-            }
-        )
-
         # Create audio directory if it doesn't exist
         os.makedirs("./generated_audio", exist_ok=True)
 
         # Generate filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        # Clean title for filename
         clean_title = "".join(c for c in story_title if c.isalnum() or c in (' ', '-', '_')).strip()
-        clean_title = clean_title.replace(' ', '_')[:50]  # Limit length
+        clean_title = clean_title.replace(' ', '_')[:50]
         filename = f"{genre}_{clean_title}_{timestamp}.mp3"
         filepath = f"./generated_audio/{filename}"
 
-        # Save audio bytes to file
-        with open(filepath, "wb") as f:
-            for chunk in audio_generator:
-                f.write(chunk)
+        print(f"  Narrative length: {len(narrative_text)} characters")
+
+        if len(narrative_text) <= MAX_CHUNK_CHARS:
+            # Single chunk - simple case
+            print(f"  ✓ Narrative within single chunk limit")
+            audio_generator = client.text_to_speech.convert(
+                voice_id=selected_voice_id,
+                text=narrative_text,
+                model_id="eleven_flash_v2_5",
+                voice_settings={
+                    "stability": 0.5,
+                    "similarity_boost": 0.75
+                }
+            )
+
+            with open(filepath, "wb") as f:
+                for chunk in audio_generator:
+                    f.write(chunk)
+        else:
+            # Multiple chunks - need to generate and concatenate
+            print(f"  Text exceeds {MAX_CHUNK_CHARS} chars, chunking...")
+
+            # Split into chunks at sentence boundaries
+            chunks = []
+            remaining = narrative_text
+            while len(remaining) > MAX_CHUNK_CHARS:
+                chunk = remaining[:MAX_CHUNK_CHARS]
+                last_period = chunk.rfind('. ')
+                if last_period > MAX_CHUNK_CHARS - 1000:
+                    chunk = remaining[:last_period + 1]
+                    remaining = remaining[last_period + 2:]
+                else:
+                    remaining = remaining[MAX_CHUNK_CHARS:]
+                chunks.append(chunk)
+            if remaining:
+                chunks.append(remaining)
+
+            print(f"  Split into {len(chunks)} chunks")
+
+            # Generate audio for each chunk
+            audio_chunks = []
+            for i, chunk_text in enumerate(chunks):
+                print(f"  Generating chunk {i + 1}/{len(chunks)} ({len(chunk_text)} chars)...")
+                audio_generator = client.text_to_speech.convert(
+                    voice_id=selected_voice_id,
+                    text=chunk_text,
+                    model_id="eleven_flash_v2_5",
+                    voice_settings={
+                        "stability": 0.5,
+                        "similarity_boost": 0.75
+                    }
+                )
+
+                chunk_filepath = f"./generated_audio/temp_chunk_{timestamp}_{i}.mp3"
+                with open(chunk_filepath, "wb") as f:
+                    for audio_chunk in audio_generator:
+                        f.write(audio_chunk)
+                audio_chunks.append(chunk_filepath)
+
+            # Concatenate audio chunks
+            print(f"  Concatenating {len(audio_chunks)} audio chunks...")
+            import subprocess
+            import shutil
+
+            ffmpeg_available = shutil.which('ffmpeg') is not None
+
+            if ffmpeg_available:
+                print(f"  Using ffmpeg for concatenation...")
+                list_file = f"./generated_audio/concat_list_{timestamp}.txt"
+                with open(list_file, 'w') as f:
+                    for chunk_file in audio_chunks:
+                        f.write(f"file '{os.path.basename(chunk_file)}'\n")
+
+                ffmpeg_cmd = [
+                    'ffmpeg', '-f', 'concat', '-safe', '0',
+                    '-i', os.path.basename(list_file),
+                    '-c', 'copy', '-y', os.path.basename(filepath)
+                ]
+
+                result = subprocess.run(
+                    ffmpeg_cmd, capture_output=True, text=True,
+                    cwd="./generated_audio"
+                )
+
+                os.remove(list_file)
+
+                if result.returncode != 0:
+                    print(f"  ⚠️  ffmpeg error: {result.stderr}")
+                    ffmpeg_available = False
+                else:
+                    print(f"  ✓ Concatenated with ffmpeg")
+
+            if not ffmpeg_available:
+                print(f"  Using binary concatenation...")
+                with open(filepath, 'wb') as outfile:
+                    for chunk_file in audio_chunks:
+                        with open(chunk_file, 'rb') as infile:
+                            outfile.write(infile.read())
+                print(f"  ✓ Concatenated (binary)")
+
+            # Clean up temp files
+            for chunk_file in audio_chunks:
+                if os.path.exists(chunk_file):
+                    os.remove(chunk_file)
 
         # Upload to storage backend (Supabase in prod, local in dev)
         from backend.storage import upload_audio
