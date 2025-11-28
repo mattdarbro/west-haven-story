@@ -15,6 +15,12 @@ from langchain_anthropic import ChatAnthropic
 from backend.config import config
 from backend.storyteller.beat_templates import get_template, get_structure_template
 from backend.storyteller.bible_enhancement import should_use_cliffhanger, should_include_cameo
+from backend.storyteller.name_registry import (
+    get_excluded_names,
+    extract_names_from_story,
+    add_used_names,
+    cleanup_expired_names
+)
 from backend.storyteller.prompts_standalone import (
     create_standalone_story_beat_prompt,
     create_prose_generation_prompt
@@ -648,6 +654,11 @@ async def generate_standalone_story(
         if cameo:
             print(f"  ✨ Including cameo: {cameo.get('name', 'N/A')}")
 
+        # Step 3.5: Get excluded names (avoid repetition)
+        excluded_names = get_excluded_names(story_bible)
+        if excluded_names.get("characters") or excluded_names.get("places"):
+            print(f"  🚫 Excluding {len(excluded_names.get('characters', []))} character names, {len(excluded_names.get('places', []))} place names")
+
         # Step 4: CBA - Generate beat plan
         print(f"\n{'─'*70}")
         print(f"CBA: PLANNING STORY BEATS")
@@ -657,7 +668,8 @@ async def generate_standalone_story(
             story_bible=story_bible,
             template=template,
             is_cliffhanger=is_cliffhanger,
-            cameo=cameo
+            cameo=cameo,
+            excluded_names=excluded_names
         )
 
         story_title = beat_plan.get("story_title", "Untitled")
@@ -741,6 +753,18 @@ async def generate_standalone_story(
         # Step 9: Create summary
         summary = f"{story_title}: {beat_plan.get('story_premise', 'A story in this world')}"
 
+        # Step 10: Extract and save used names (to avoid repetition in future stories)
+        extracted = extract_names_from_story(beat_plan, narrative, story_bible)
+        if extracted.get("characters") or extracted.get("places"):
+            story_bible = add_used_names(
+                story_bible,
+                character_names=extracted.get("characters", []),
+                place_names=extracted.get("places", [])
+            )
+            # Clean up expired names
+            story_bible = cleanup_expired_names(story_bible)
+            print(f"\n  📝 Saved {len(extracted.get('characters', []))} character names, {len(extracted.get('places', []))} place names to registry")
+
         # Calculate total time
         total_time = time.time() - start_time
 
@@ -770,7 +794,8 @@ async def generate_standalone_story(
                 "generation_time_seconds": total_time,
                 "template_used": template.name,
                 "tts_provider": tts_provider
-            }
+            },
+            "updated_bible": story_bible  # Contains updated used_names registry
         }
 
     except Exception as e:
@@ -790,7 +815,8 @@ async def generate_beat_plan(
     story_bible: Dict[str, Any],
     template: Any,
     is_cliffhanger: bool = False,
-    cameo: Dict[str, Any] = None
+    cameo: Dict[str, Any] = None,
+    excluded_names: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     """
     CBA: Generate beat plan for the story.
@@ -806,7 +832,8 @@ async def generate_beat_plan(
         beat_template=template.to_dict(),
         is_cliffhanger=is_cliffhanger,
         cameo=cameo,
-        user_preferences=user_preferences
+        user_preferences=user_preferences,
+        excluded_names=excluded_names
     )
 
     # Initialize LLM
