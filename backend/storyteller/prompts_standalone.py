@@ -13,7 +13,8 @@ def create_standalone_story_beat_prompt(
     beat_template: dict,
     is_cliffhanger: bool = False,
     cameo: dict = None,
-    user_preferences: dict = None
+    user_preferences: dict = None,
+    excluded_names: dict = None
 ) -> str:
     """
     Create prompt for CBA to plan a standalone story using a beat template.
@@ -24,6 +25,7 @@ def create_standalone_story_beat_prompt(
         is_cliffhanger: Whether to end on a cliffhanger (free tier)
         cameo: Optional cameo character to include
         user_preferences: User preferences from ratings
+        excluded_names: Dict with 'characters' and 'places' lists to avoid
 
     Returns:
         Formatted prompt for CBA
@@ -78,6 +80,20 @@ Based on their ratings, this user prefers:
 
 Adjust the story to match these preferences while staying true to the genre.
 """
+
+    # Excluded names context (to avoid repetition)
+    excluded_names_context = ""
+    if excluded_names:
+        char_names = excluded_names.get("characters", [])
+        place_names = excluded_names.get("places", [])
+
+        if char_names or place_names:
+            excluded_names_context = "\n\n## AVOID THESE NAMES (recently used)\n\n"
+            if char_names:
+                excluded_names_context += f"**Character names to AVOID**: {', '.join(char_names[:20])}\n"
+            if place_names:
+                excluded_names_context += f"**Place names to AVOID**: {', '.join(place_names[:20])}\n"
+            excluded_names_context += "\n**Create FRESH, unique names** that feel different from these. Use diverse cultural backgrounds and naming styles."
 
     # Cameo context
     cameo_context = ""
@@ -186,6 +202,7 @@ This is a STANDALONE story (not part of a series), but it exists in an establish
 
 {history_context}
 {prefs_context}
+{excluded_names_context}
 {cameo_context}
 {ending_style}
 
